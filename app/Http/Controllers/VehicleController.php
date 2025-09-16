@@ -1,10 +1,10 @@
 <?php
 
-
 namespace App\Http\Controllers;
 
 use App\Models\Vehicle;
 use App\Models\RentalRate;
+use App\Services\VehicleFactory; // NEW: Import the Factory Service
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -14,7 +14,6 @@ class VehicleController extends Controller {
     public function index(Request $request) {
         $query = Vehicle::with('rentalRate');
 
-        // Apply filters
         if ($request->filled('type')) {
             $query->where('type', $request->type);
         }
@@ -43,13 +42,12 @@ class VehicleController extends Controller {
         return view('vehicles.index', compact('vehicles'));
     }
 
-// Show the form for creating a new vehicle
-
+    // Show the form for creating a new vehicle
     public function create() {
         return view('vehicles.create');
     }
 
- //Store a newly created vehicle in storage
+    //Store a newly created vehicle in storage
     public function store(Request $request) {
         $validated = $request->validate([
             'license_plate' => 'required|string|max:20|unique:vehicles,license_plate',
@@ -70,34 +68,22 @@ class VehicleController extends Controller {
             'monthly_rate' => 'nullable|numeric|min:0'
         ]);
 
-        // Handle image upload OR URL - FIXED
+        //image upload OR URL
         if ($request->hasFile('image')) {
             $imagePath = $request->file('image')->store('vehicles', 'public');
             $validated['image_url'] = '/storage/' . $imagePath;
         } elseif ($request->filled('image_url')) {
-            // If image URL is provided, use it
+
             $validated['image_url'] = $request->image_url;
         }
 
-        // Create vehicle
-        $vehicle = Vehicle::create($validated);
-
-        // Create rental rate
-        RentalRate::create([
-            'vehicle_id' => $vehicle->id,
-            'daily_rate' => $validated['daily_rate'],
-            'weekly_rate' => $validated['weekly_rate'] ?? null,
-            'monthly_rate' => $validated['monthly_rate'] ?? null,
-            'hourly_rate' => $validated['daily_rate'] / 8,
-            'late_fee_per_hour' => 10.00
-        ]);
+        $vehicle = VehicleFactory::createVehicle($validated);
 
         return redirect()->route('admin.vehicles')
-                        ->with('success', 'Vehicle added successfully!');
+                        ->with('success', 'Vehicle added successfully using Factory Method Pattern!');
     }
 
-//Display the specified car
-
+    //Display the specified car
     public function show($id) {
         $vehicle = Vehicle::with('rentalRate')->findOrFail($id);
 
@@ -151,45 +137,24 @@ class VehicleController extends Controller {
             $validated['image_url'] = $request->image_url;
         }
 
-        // Update vehicle
-        $vehicle->update($validated);
-
-        // Update rental rate
-        $rentalRate = $vehicle->rentalRate;
-        if ($rentalRate) {
-            $rentalRate->update([
-                'daily_rate' => $validated['daily_rate'],
-                'weekly_rate' => $validated['weekly_rate'] ?? null,
-                'monthly_rate' => $validated['monthly_rate'] ?? null,
-                'hourly_rate' => $validated['daily_rate'] / 8,
-            ]);
-        } else {
-            // Create rental rate no exits
-            RentalRate::create([
-                'vehicle_id' => $vehicle->id,
-                'daily_rate' => $validated['daily_rate'],
-                'weekly_rate' => $validated['weekly_rate'] ?? null,
-                'monthly_rate' => $validated['monthly_rate'] ?? null,
-                'hourly_rate' => $validated['daily_rate'] / 8,
-                'late_fee_per_hour' => 10.00
-            ]);
-        }
+        $vehicle = VehicleFactory::updateVehicle($vehicle, $validated);
 
         return redirect()->route('admin.vehicles')
-                        ->with('success', 'Vehicle updated successfully!');
+                        ->with('success', 'Vehicle updated successfully using Factory Method Pattern!');
     }
 
  //Remove the specified vehicle from storage
+
     public function destroy($id) {
         $vehicle = Vehicle::findOrFail($id);
 
-        // Check vehicle has status
+        // Check vehicle status
         if ($vehicle->bookings()->where('status', 'active')->exists()) {
             return redirect()->route('admin.vehicles')
                             ->with('error', 'Cannot delete vehicle with active bookings!');
         }
 
-        // Delete image file if it exists
+        // Delete image file
         if ($vehicle->image_url && Storage::disk('public')->exists(str_replace('/storage/', '', $vehicle->image_url))) {
             Storage::disk('public')->delete(str_replace('/storage/', '', $vehicle->image_url));
         }
@@ -215,5 +180,18 @@ class VehicleController extends Controller {
 
         return redirect()->back()
                         ->with('success', 'Vehicle status updated to ' . $newStatus . '!');
+    }
+
+
+    public function getTypeDefaults(Request $request) {
+        $type = $request->get('type');
+
+        if (!in_array($type, VehicleFactory::getSupportedTypes())) {
+            return response()->json(['error' => 'Unsupported vehicle type'], 400);
+        }
+
+        $defaults = VehicleFactory::getTypeDefaults($type);
+
+        return response()->json(['defaults' => $defaults]);
     }
 }
