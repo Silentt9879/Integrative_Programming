@@ -96,7 +96,7 @@ class VehicleController extends Controller {
                         ->with('success', 'Vehicle added successfully!');
     }
 
-//Display the specified vehicle
+//Display the specified car
 
     public function show($id) {
         $vehicle = Vehicle::with('rentalRate')->findOrFail($id);
@@ -139,7 +139,7 @@ class VehicleController extends Controller {
             'monthly_rate' => 'nullable|numeric|min:0'
         ]);
 
-        //image upload 
+        //image upload
         if ($request->hasFile('image')) {
             if ($vehicle->image_url && Storage::disk('public')->exists(str_replace('/storage/', '', $vehicle->image_url))) {
                 Storage::disk('public')->delete(str_replace('/storage/', '', $vehicle->image_url));
@@ -151,7 +151,7 @@ class VehicleController extends Controller {
             $validated['image_url'] = $request->image_url;
         }
 
-        // Update vehicle 
+        // Update vehicle
         $vehicle->update($validated);
 
         // Update rental rate
