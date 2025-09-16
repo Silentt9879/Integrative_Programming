@@ -8,10 +8,13 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use App\Models\User;
 use App\Models\Vehicle;
 use App\Models\Booking;
+use App\State\StateFactory; // STATE PATTERN - Chong Zheng Yao
 use App\Http\Controllers\ReportsController;
+use App\Factory\VehicleFactoryRegistry; // Factory Method Pattern - Tan Xing Ye
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -315,9 +318,7 @@ class AdminController extends Controller {
         }
     }
 
-    /**
-     * Delete customer
-     */
+    //Delete customer
     public function deleteCustomer(User $user) {
         $this->ensureAdminAccess();
         if ($user->is_admin) {
@@ -349,9 +350,7 @@ class AdminController extends Controller {
         }
     }
 
-    /**
-     * Vehicle Management - Comprehensive vehicle management with filtering and search
-     */
+    //Vehicle Management -  filtering & search - Tan Xing Ye
     public function vehicles(Request $request) {
         $this->ensureAdminAccess();
 
@@ -387,12 +386,12 @@ class AdminController extends Controller {
             case 'price_low':
                 $query->join('rental_rates', 'vehicles.id', '=', 'rental_rates.vehicle_id')
                         ->orderBy('rental_rates.daily_rate', 'asc')
-                        ->select('vehicles.*'); // Ensure we only select vehicle columns
+                        ->select('vehicles.*');
                 break;
             case 'price_high':
                 $query->join('rental_rates', 'vehicles.id', '=', 'rental_rates.vehicle_id')
                         ->orderBy('rental_rates.daily_rate', 'desc')
-                        ->select('vehicles.*'); // Ensure we only select vehicle columns
+                        ->select('vehicles.*');
                 break;
             case 'mileage':
                 $query->orderBy('current_mileage', 'asc');
@@ -405,7 +404,7 @@ class AdminController extends Controller {
 
         $vehicles = $query->paginate(12)->appends($request->query());
 
-        // Calculate statistics
+        // Cal statistics
         $totalVehicles = Vehicle::count();
         $availableVehicles = Vehicle::where('status', 'available')->count();
         $rentedVehicles = Vehicle::where('status', 'rented')->count();
@@ -420,9 +419,7 @@ class AdminController extends Controller {
                 ));
     }
 
-    /**
-     * Toggle vehicle status (available -> rented -> maintenance -> available)
-     */
+    // vehicle status
     public function toggleStatus(Vehicle $vehicle) {
         $this->ensureAdminAccess();
 
@@ -436,30 +433,61 @@ class AdminController extends Controller {
         return back()->with('success', 'Vehicle status updated successfully!');
     }
 
-    /**
-     * Show create vehicle form for admin
-     */
+    //Show create vehicle list
     public function createVehicle() {
         $this->ensureAdminAccess();
         return view('admin.create');
     }
 
-    /**
-     * Store new vehicle (for future implementation)
-     */
+    //Store new vehicle  - Factory Method Pattern - Tan Xing Ye
     public function storeVehicle(Request $request) {
         $this->ensureAdminAccess();
 
-        // Validation and store logic will be implemented here
-        // This is a placeholder for future development
+        $validated = $request->validate([
+            'license_plate' => 'required|string|max:20|unique:vehicles,license_plate',
+            'make' => 'required|string|max:50',
+            'model' => 'required|string|max:50',
+            'year' => 'required|integer|min:1900|max:' . (date('Y') + 1),
+            'color' => 'required|string|max:30',
+            'type' => 'required|in:Sedan,SUV,Luxury,Economy,Truck,Van',
+            'seating_capacity' => 'required|integer|min:1|max:15',
+            'fuel_type' => 'required|in:Petrol,Diesel,Electric,Hybrid',
+            'current_mileage' => 'required|numeric|min:0',
+            'status' => 'required|in:available,rented,maintenance',
+            'description' => 'nullable|string|max:500',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'image_url' => 'nullable|url',
+            'daily_rate' => 'required|numeric|min:0',
+            'weekly_rate' => 'nullable|numeric|min:0',
+            'monthly_rate' => 'nullable|numeric|min:0'
+        ]);
 
-        return redirect()->route('admin.vehicles')
-                        ->with('success', 'Vehicle created successfully!');
+        // image url
+        if ($request->hasFile('image')) {
+            $imagePath = $request->file('image')->store('vehicles', 'public');
+            $validated['image_url'] = '/storage/' . $imagePath;
+        } elseif ($request->filled('image_url')) {
+            $validated['image_url'] = $request->image_url;
+        }
+
+        try {
+            $creator = VehicleFactoryRegistry::getCreator($validated['type']);
+            $vehicle = $creator->processVehicle($validated);
+
+            return redirect()->route('admin.vehicles')
+                            ->with('success', 'Vehicle added successfully using Factory Method Pattern!');
+        } catch (\InvalidArgumentException $e) {
+            return redirect()->back()
+                            ->withErrors(['type' => 'Unsupported vehicle type: ' . $validated['type']])
+                            ->withInput();
+        } catch (\Exception $e) {
+            return redirect()->back()
+                            ->withErrors(['error' => 'Failed to create vehicle: ' . $e->getMessage()])
+                            ->withInput();
+        }
     }
 
-    /**
-     * Show edit vehicle form
-     */
+    //show edit vehicle
     public function editVehicle(Vehicle $vehicle) {
         $this->ensureAdminAccess();
 
@@ -468,22 +496,61 @@ class AdminController extends Controller {
         return view('admin.edit', compact('vehicle'));
     }
 
-    /**
-     * Update vehicle (for future implementation)
-     */
+    //Update/edit vehicle - Factory Method Pattern -Tan Xing Ye
     public function updateVehicle(Request $request, Vehicle $vehicle) {
         $this->ensureAdminAccess();
 
-        // Validation and update logic will be implemented here
-        // This is a placeholder for future development
+        $validated = $request->validate([
+            'license_plate' => 'required|string|max:20|unique:vehicles,license_plate,' . $vehicle->id,
+            'make' => 'required|string|max:50',
+            'model' => 'required|string|max:50',
+            'year' => 'required|integer|min:1900|max:' . (date('Y') + 1),
+            'color' => 'required|string|max:30',
+            'type' => 'required|in:Sedan,SUV,Luxury,Economy,Truck,Van',
+            'seating_capacity' => 'required|integer|min:1|max:15',
+            'fuel_type' => 'required|in:Petrol,Diesel,Electric,Hybrid',
+            'current_mileage' => 'required|numeric|min:0',
+            'status' => 'required|in:available,rented,maintenance',
+            'description' => 'nullable|string|max:500',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'image_url' => 'nullable|url',
+            'daily_rate' => 'required|numeric|min:0',
+            'weekly_rate' => 'nullable|numeric|min:0',
+            'monthly_rate' => 'nullable|numeric|min:0'
+        ]);
 
-        return redirect()->route('admin.vehicles')
-                        ->with('success', 'Vehicle updated successfully!');
+        // Handle image upload
+        if ($request->hasFile('image')) {
+            // Delete old image if exists
+            if ($vehicle->image_url && Storage::disk('public')->exists(str_replace('/storage/', '', $vehicle->image_url))) {
+                Storage::disk('public')->delete(str_replace('/storage/', '', $vehicle->image_url));
+            }
+
+            $imagePath = $request->file('image')->store('vehicles', 'public');
+            $validated['image_url'] = '/storage/' . $imagePath;
+        } elseif ($request->filled('image_url')) {
+            $validated['image_url'] = $request->image_url;
+        }
+
+        //updates
+        try {
+            $creator = VehicleFactoryRegistry::getCreator($validated['type']);
+            $vehicle = $creator->updateVehicle($vehicle, $validated);
+
+            return redirect()->route('admin.vehicles')
+                            ->with('success', 'Vehicle updated successfully using Factory Method Pattern!');
+        } catch (\InvalidArgumentException $e) {
+            return redirect()->back()
+                            ->withErrors(['type' => 'Unsupported vehicle type: ' . $validated['type']])
+                            ->withInput();
+        } catch (\Exception $e) {
+            return redirect()->back()
+                            ->withErrors(['error' => 'Failed to update vehicle: ' . $e->getMessage()])
+                            ->withInput();
+        }
     }
 
-    /**
-     * Delete vehicle
-     */
+    //Delete vehicle
     public function deleteVehicle(Vehicle $vehicle) {
         $this->ensureAdminAccess();
 
@@ -496,20 +563,46 @@ class AdminController extends Controller {
             return back()->with('error', 'Cannot delete vehicle with active bookings.');
         }
 
+        // Delete image file if exists
+        if ($vehicle->image_url && Storage::disk('public')->exists(str_replace('/storage/', '', $vehicle->image_url))) {
+            Storage::disk('public')->delete(str_replace('/storage/', '', $vehicle->image_url));
+        }
+
+        // Delete related rental rate
+        if ($vehicle->rentalRate) {
+            $vehicle->rentalRate->delete();
+        }
+
         $vehicle->delete();
 
         return back()->with('success', 'Vehicle deleted successfully!');
     }
 
-    /**
-     * Booking Management - Comprehensive booking management with real statistics
-     */
+    //error Get type defaults using Factory Method Pattern - Tan Xing Ye
+    public function getTypeDefaults(Request $request) {
+        $this->ensureAdminAccess();
+
+        $type = $request->get('type');
+
+        if (!VehicleFactoryRegistry::isSupported($type)) {
+            return response()->json(['error' => 'Unsupported vehicle type'], 400);
+        }
+
+        try {
+            $defaults = VehicleFactoryRegistry::getTypeDefaults($type);
+            return response()->json(['defaults' => $defaults]);
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Failed to get type defaults: ' . $e->getMessage()], 500);
+        }
+    }
+
+    //Booking Management - State Pattern - Chong Zheng Yao
+
     public function bookings(Request $request) {
         $this->ensureAdminAccess();
 
         $query = Booking::with(['user', 'vehicle']);
 
-        // Apply filters
         if ($request->filled('status')) {
             $query->where('status', $request->status);
         }
@@ -525,7 +618,7 @@ class AdminController extends Controller {
             });
         }
 
-        // Apply date range filter
+        // date range filter
         if ($request->filled('date_range')) {
             switch ($request->date_range) {
                 case 'today':
@@ -562,51 +655,344 @@ class AdminController extends Controller {
 
         $bookings = $query->paginate(15)->appends($request->query());
 
-        // Calculate real statistics
+        // state information to each booking - State Pattern
+        $bookings->each(function ($booking) {
+            $booking->availableActions = $booking->getAvailableActions();
+            $booking->stateMessage = $booking->getStateMessage();
+            $booking->nextState = $booking->getNextState();
+            $booking->canTransition = [
+                'confirmed' => $booking->canTransitionTo('confirmed'),
+                'active' => $booking->canTransitionTo('active'),
+                'completed' => $booking->canTransitionTo('completed'),
+                'cancelled' => $booking->canTransitionTo('cancelled')
+            ];
+        });
+
+        // Cal real statistics
         $totalBookings = Booking::count();
         $pendingBookings = Booking::where('status', 'pending')->count();
         $confirmedBookings = Booking::where('status', 'confirmed')->count();
+        $activeBookings = Booking::where('status', 'active')->count();
+        $completedBookings = Booking::where('status', 'completed')->count();
+        $cancelledBookings = Booking::where('status', 'cancelled')->count();
         $totalRevenue = Booking::where('payment_status', 'paid')->sum('total_amount');
 
+        // Get possible states from State Factory
+        $allStates = StateFactory::getAllStates();
+        $stateWorkflow = StateFactory::getStateWorkflow();
+
         return view('admin.bookings', compact(
-                        'bookings',
-                        'totalBookings',
-                        'pendingBookings',
-                        'confirmedBookings',
-                        'totalRevenue'
-                ));
+            'bookings',
+            'totalBookings',
+            'pendingBookings',
+            'confirmedBookings',
+            'activeBookings',
+            'completedBookings',
+            'cancelledBookings',
+            'totalRevenue',
+            'allStates',
+            'stateWorkflow'
+        ));
     }
 
-    /**
-     * Show booking details for admin (AJAX)
-     */
+    //Show booking details (AJAX) - State Pattern - Chong Zheng Yao
     public function showBooking(Booking $booking) {
         $this->ensureAdminAccess();
 
         $booking->load(['user', 'vehicle']);
 
+        $booking->availableActions = $booking->getAvailableActions();
+        $booking->stateMessage = $booking->getStateMessage();
+        $booking->nextState = $booking->getNextState();
+        $booking->statusDescription = $booking->getStatusDescription();
+        $booking->isTerminal = $booking->isInTerminalState();
+        $booking->requiresPayment = $booking->requiresPayment();
+
+        // Get available transitions
+        $booking->canTransition = [
+            'confirmed' => $booking->canTransitionTo('confirmed'),
+            'active' => $booking->canTransitionTo('active'),
+            'completed' => $booking->canTransitionTo('completed'),
+            'cancelled' => $booking->canTransitionTo('cancelled')
+        ];
+
         $html = view('admin.partials.booking-details', compact('booking'))->render();
 
         return response()->json([
-                    'success' => true,
-                    'html' => $html
+            'success' => true,
+            'html' => $html,
+            'stateInfo' => [
+                'currentState' => $booking->status,
+                'availableActions' => $booking->availableActions,
+                'nextState' => $booking->nextState,
+                'stateMessage' => $booking->stateMessage,
+                'canTransition' => $booking->canTransition,
+                'requiresPayment' => $booking->requiresPayment
+            ]
         ]);
     }
 
-    /**
-     * Update booking status
-     */
+    //Update booking status - Chong Zheng Yao
     public function updateBookingStatus(Request $request, Booking $booking) {
         $this->ensureAdminAccess();
 
         $request->validate([
-            'status' => 'required|in:pending,confirmed,active,ongoing,completed,cancelled'
+            'status' => 'required|in:pending,confirmed,active,completed,cancelled',
+            'reason' => 'nullable|string|max:500',
+            'damage_charges' => 'nullable|numeric|min:0',
+            'notes' => 'nullable|string|max:1000'
         ]);
 
-        $booking->status = $request->status;
-        $booking->save();
+        $newStatus = $request->status;
+        $currentStatus = $booking->status;
 
-        return back()->with('success', 'Booking status updated successfully!');
+        // Use to validate & perform transition (State Pattern )
+        if (!$booking->canTransitionTo($newStatus)) {
+            return response()->json([
+                'success' => false,
+                'message' => "Cannot transition from '{$currentStatus}' to '{$newStatus}'. " .
+                            "Allowed transitions: " . implode(', ', $booking->getAvailableActions())
+            ], 400);
+        }
+
+        // Perform the state transition
+        $transitioned = false;
+        $message = '';
+
+        try {
+            switch ($newStatus) {
+                case 'confirmed':
+                    // Check payment status be4 confirming
+                    if ($booking->payment_status !== 'paid' && $currentStatus === 'pending') {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'Cannot confirm booking without payment. Payment status is: ' . $booking->payment_status
+                        ], 400);
+                    }
+                    $transitioned = $booking->confirm();
+                    $message = 'Booking confirmed successfully';
+                    break;
+
+                case 'active':
+                    // pickup time has arrived ?
+                    if ($booking->pickup_datetime > now()) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'Cannot activate booking before pickup time: ' .
+                                       $booking->pickup_datetime->format('M d, Y h:i A')
+                        ], 400);
+                    }
+                    $transitioned = $booking->activate();
+                    $message = 'Booking activated (vehicle picked up)';
+                    break;
+
+                case 'completed':
+                    $completionData = [];
+                    if ($request->filled('damage_charges')) {
+                        $completionData['damage_charges'] = $request->damage_charges;
+                    }
+                    if ($request->filled('notes')) {
+                        $completionData['notes'] = $request->notes;
+                    }
+                    $transitioned = $booking->complete($completionData);
+                    $message = 'Booking completed successfully';
+                    break;
+
+                case 'cancelled':
+                    $reason = $request->reason ?? 'Cancelled by administrator';
+                    $transitioned = $booking->cancel($reason);
+                    $message = 'Booking cancelled successfully';
+                    break;
+
+                default:
+                    // For any other status, try direct update
+                    $booking->status = $newStatus;
+                    $booking->save();
+                    $transitioned = true;
+                    $message = 'Booking status updated to ' . $newStatus;
+            }
+
+            if (!$transitioned) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to transition booking status. Please check booking constraints.'
+                ], 400);
+            }
+
+            // updated state information
+            $booking->refresh();
+            $stateInfo = [
+                'currentState' => $booking->status,
+                'availableActions' => $booking->getAvailableActions(),
+                'nextState' => $booking->getNextState(),
+                'stateMessage' => $booking->getStateMessage(),
+                'statusBadgeColor' => $booking->status_badge_color
+            ];
+
+            // retuen JSON for AJAX requests
+            if ($request->ajax()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => $message,
+                    'stateInfo' => $stateInfo
+                ]);
+            }
+
+            // Redirect for regular requests
+            return back()->with('success', $message);
+
+        } catch (\Exception $e) {
+            Log::error('Booking status update failed', [
+                'booking_id' => $booking->id,
+                'attempted_status' => $newStatus,
+                'error' => $e->getMessage()
+            ]);
+
+            if ($request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Error updating booking status: ' . $e->getMessage()
+                ], 500);
+            }
+
+            return back()->with('error', 'Error updating booking status: ' . $e->getMessage());
+        }
+    }
+
+    // Confirm a booking - Chong Zheng Yao
+    public function confirmBooking(Request $request, Booking $booking) {
+        $this->ensureAdminAccess();
+
+        if (!$booking->canPerformAction('confirm')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This booking cannot be confirmed in its current state.'
+            ], 400);
+        }
+
+        if ($booking->confirm()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Booking confirmed successfully',
+                'newStatus' => $booking->status,
+                'nextActions' => $booking->getAvailableActions()
+            ]);
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to confirm booking'
+        ], 400);
+    }
+
+   //Activate a booking from admin panel
+    public function activateBooking(Request $request, Booking $booking) {
+        $this->ensureAdminAccess();
+
+        if (!$booking->canPerformAction('activate')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This booking cannot be activated. Pickup time may not have arrived.'
+            ], 400);
+        }
+
+        if ($booking->activate()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Booking activated successfully',
+                'newStatus' => $booking->status,
+                'nextActions' => $booking->getAvailableActions()
+            ]);
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to activate booking'
+        ], 400);
+    }
+
+  //Complete booking
+    public function completeBooking(Request $request, Booking $booking) {
+        $this->ensureAdminAccess();
+
+        $validated = $request->validate([
+            'damage_charges' => 'nullable|numeric|min:0',
+            'notes' => 'nullable|string|max:500'
+        ]);
+
+        if (!$booking->canPerformAction('complete')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This booking cannot be completed in its current state.'
+            ], 400);
+        }
+
+        if ($booking->complete($validated)) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Booking completed successfully',
+                'newStatus' => $booking->status,
+                'finalAmount' => $booking->final_amount
+            ]);
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to complete booking'
+        ], 400);
+    }
+
+    //Cancel a booking
+    public function cancelBooking(Request $request, Booking $booking) {
+        $this->ensureAdminAccess();
+
+        $validated = $request->validate([
+            'reason' => 'required|string|max:500'
+        ]);
+
+        if (!$booking->canPerformAction('cancel')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This booking cannot be cancelled in its current state.'
+            ], 400);
+        }
+
+        if ($booking->cancel($validated['reason'])) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Booking cancelled successfully',
+                'newStatus' => $booking->status
+            ]);
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to cancel booking'
+        ], 400);
+    }
+
+    //Get booking state information
+    public function getBookingStateInfo(Booking $booking) {
+        $this->ensureAdminAccess();
+
+        return response()->json([
+            'success' => true,
+            'stateInfo' => [
+                'currentState' => $booking->status,
+                'statusDescription' => $booking->getStatusDescription(),
+                'availableActions' => $booking->getAvailableActions(),
+                'nextState' => $booking->getNextState(),
+                'stateMessage' => $booking->getStateMessage(),
+                'requiresPayment' => $booking->requiresPayment(),
+                'isTerminal' => $booking->isInTerminalState(),
+                'canTransition' => [
+                    'confirmed' => $booking->canTransitionTo('confirmed'),
+                    'active' => $booking->canTransitionTo('active'),
+                    'completed' => $booking->canTransitionTo('completed'),
+                    'cancelled' => $booking->canTransitionTo('cancelled')
+                ]
+            ]
+        ]);
     }
 
     /**
@@ -696,7 +1082,7 @@ class AdminController extends Controller {
         $activeRentals = Booking::where('status', 'active')
             ->whereBetween('pickup_datetime', [$dateFrom, $dateTo])
             ->count();
-        
+
         $utilizationRate = $totalVehicles > 0 ?
             round(($activeRentals / $totalVehicles) * 100, 2) : 0;
 

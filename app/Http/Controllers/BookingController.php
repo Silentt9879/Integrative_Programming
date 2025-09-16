@@ -4,15 +4,16 @@ namespace App\Http\Controllers;
 
 use App\Models\Booking;
 use App\Models\Vehicle;
-use App\Services\BookingStateManager; // NEW: Import the State Manager
+use App\State\StateFactory; // Add this import
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
-use Barryvdh\DomPDF\Facade\Pdf;
 
 class BookingController extends Controller {
 
-//Display user's bookings
+    /**
+     * Display user's bookings
+     */
     public function index() {
         $user = Auth::user();
 
@@ -24,7 +25,9 @@ class BookingController extends Controller {
         return view('booking.index', compact('bookings'));
     }
 
-    //Show booking form for a specific vehicle
+    /**
+     * Show booking form for a specific vehicle
+     */
     public function create($vehicleId) {
         $vehicle = Vehicle::with('rentalRate')->findOrFail($vehicleId);
 
@@ -37,7 +40,9 @@ class BookingController extends Controller {
         return view('booking.create', compact('vehicle'));
     }
 
-    //Store a new booking
+    /**
+     * Store a new booking
+     */
     public function store(Request $request) {
         $validated = $request->validate([
             'vehicle_id' => 'required|exists:vehicles,id',
@@ -60,18 +65,18 @@ class BookingController extends Controller {
         $returnDateTime = Carbon::createFromFormat('Y-m-d H:i',
                 $validated['return_date'] . ' ' . $validated['return_time']);
 
-        // Check vehicle availability for dates
+        // Check vehicle availability for these dates
         if (!$this->isVehicleAvailable($vehicle->id, $pickupDateTime, $returnDateTime)) {
             return back()->withErrors(['dates' => 'Vehicle is not available for the selected dates.'])
                             ->withInput();
         }
 
-        // Cal total cost
+        // Calculate total cost
         $days = $pickupDateTime->diffInDays($returnDateTime) ?: 1;
         $totalAmount = $vehicle->rentalRate->calculateRate($days);
         $depositAmount = $totalAmount * 0.3; // 30% deposit
 
-        //Create booking in 'pending' state (State Pattern)
+        // Create booking
         $booking = Booking::create([
             'customer_name' => $user->name,
             'customer_email' => $user->email,
@@ -85,17 +90,19 @@ class BookingController extends Controller {
             'return_location' => $validated['return_location'],
             'total_amount' => $totalAmount,
             'deposit_amount' => $depositAmount,
-            'status' => 'pending', // State Pattern: Start in pending state
+            'status' => 'pending',
             'payment_status' => 'pending',
             'special_requests' => $validated['special_requests']
         ]);
 
         // Redirect to payment instead of confirmation
         return redirect()->route('payment.form', $booking->id)
-                        ->with('success', 'Booking created using State Pattern! Please complete payment to confirm.');
+                        ->with('success', 'Booking created! Please complete payment to confirm your reservation.');
     }
 
-    //Show booking confirmation page
+    /**
+     * Show booking confirmation page
+     */
     public function confirmation($bookingId) {
         $booking = Booking::with(['vehicle', 'vehicle.rentalRate'])
                 ->where('id', $bookingId)
@@ -105,45 +112,130 @@ class BookingController extends Controller {
         return view('booking.confirmation', compact('booking'));
     }
 
-//Show specific booking details
-
+    /**
+     * Show specific booking details
+     */
     public function show($bookingId) {
         $booking = Booking::with(['vehicle', 'vehicle.rentalRate'])
                 ->where('id', $bookingId)
                 ->where('user_id', Auth::id())
                 ->firstOrFail();
 
-        //Get available actions using State Pattern
+        // Get available actions using State Pattern
         $availableActions = $booking->getAvailableActions();
         $stateMessage = $booking->getStateMessage();
-        $nextState = $booking->getNextState();
 
-        return view('booking.show', compact('booking', 'availableActions', 'stateMessage', 'nextState'));
+        return view('booking.show', compact('booking', 'availableActions', 'stateMessage'));
     }
 
- //Cancel a booking
-
+    /**
+     * Cancel a booking - UPDATED to use State Pattern
+     */
     public function cancel($bookingId) {
         $booking = Booking::where('id', $bookingId)
                 ->where('user_id', Auth::id())
                 ->firstOrFail();
 
-
-        if (!$booking->canTransitionTo('cancelled')) {
+        // Use State Pattern to check if cancellation is allowed
+        if (!$booking->canPerformAction('cancel')) {
             return back()->with('error', 'This booking cannot be cancelled in its current state.');
         }
 
-        //Use State Pattern to cancel booking
-        if ($booking->cancel('Cancelled by customer')) {
-            return redirect()->route('booking.index')
-                            ->with('success', 'Booking cancelled successfully using State Pattern.');
-        } else {
-            return back()->with('error', 'Failed to cancel booking.');
+        // Use State Pattern method to cancel
+        $cancelled = $booking->cancel('Cancelled by customer');
+
+        if (!$cancelled) {
+            return back()->with('error', 'Unable to cancel booking. It may be too close to pickup time.');
         }
+
+        return redirect()->route('booking.index')
+                        ->with('success', 'Booking cancelled successfully.');
     }
 
-// Check vehicle availability
+    /**
+     * Confirm booking - UPDATED to use State Pattern
+     */
+    public function confirm($bookingId) {
+        $booking = Booking::where('id', $bookingId)
+                ->where('user_id', Auth::id())
+                ->firstOrFail();
 
+        // Check if confirmation action is available
+        if (!$booking->canPerformAction('confirm')) {
+            if ($booking->requiresPayment()) {
+                return redirect()->route('payment.form', $booking->id)
+                                ->with('info', 'Please complete payment to confirm your booking.');
+            }
+            return back()->with('error', 'This booking cannot be confirmed in its current state.');
+        }
+
+        // Use State Pattern to confirm booking
+        $confirmed = $booking->confirm();
+
+        if (!$confirmed) {
+            return back()->with('error', 'Unable to confirm booking. Please ensure payment is completed.');
+        }
+
+        return redirect()->route('booking.show', $booking->id)
+                        ->with('success', 'Booking confirmed successfully!');
+    }
+
+    /**
+     * Activate booking (mark as picked up) - NEW METHOD using State Pattern
+     */
+    public function activate($bookingId) {
+        $booking = Booking::where('id', $bookingId)
+                ->where('user_id', Auth::id())
+                ->firstOrFail();
+
+        // Check if activation is allowed
+        if (!$booking->canPerformAction('activate')) {
+            return back()->with('error', 'Cannot activate booking. The pickup time may not have arrived yet.');
+        }
+
+        // Use State Pattern to activate
+        $activated = $booking->activate();
+
+        if (!$activated) {
+            return back()->with('error', 'Unable to activate booking.');
+        }
+
+        return redirect()->route('booking.show', $booking->id)
+                        ->with('success', 'Vehicle pickup confirmed. Rental is now active!');
+    }
+
+    /**
+     * Complete booking (mark as returned) - NEW METHOD using State Pattern
+     */
+    public function complete(Request $request, $bookingId) {
+        $booking = Booking::where('id', $bookingId)
+                ->where('user_id', Auth::id())
+                ->firstOrFail();
+
+        // Check if completion is allowed
+        if (!$booking->canPerformAction('complete')) {
+            return back()->with('error', 'Cannot complete booking. The rental may still be active.');
+        }
+
+        $data = $request->validate([
+            'damage_charges' => 'nullable|numeric|min:0',
+            'return_notes' => 'nullable|string|max:500'
+        ]);
+
+        // Use State Pattern to complete booking
+        $completed = $booking->complete($data);
+
+        if (!$completed) {
+            return back()->with('error', 'Unable to complete booking.');
+        }
+
+        return redirect()->route('booking.show', $booking->id)
+                        ->with('success', 'Booking completed successfully!');
+    }
+
+    /**
+     * Check vehicle availability
+     */
     public function checkAvailability(Request $request) {
         $request->validate([
             'vehicle_id' => 'required|exists:vehicles,id',
@@ -162,8 +254,9 @@ class BookingController extends Controller {
         ]);
     }
 
-    //Vehicle availability search
-
+    /**
+     * Vehicle availability search
+     */
     public function search(Request $request) {
         $validated = $request->validate([
             'pickup_date' => 'required|date|after_or_equal:today',
@@ -193,17 +286,21 @@ class BookingController extends Controller {
         return view('booking.search', compact('availableVehicles', 'pickupDate', 'returnDate', 'validated'));
     }
 
-    //Show search form
+    /**
+     * Show search form
+     */
     public function searchForm() {
         return view('booking.search-form');
     }
 
-    //Private method to check vehicle availability
+    /**
+     * Private method to check vehicle availability
+     */
     private function isVehicleAvailable($vehicleId, $pickupDate, $returnDate) {
         // Check for overlapping bookings
         $overlappingBookings = Booking::where('vehicle_id', $vehicleId)
-                ->whereIn('status', ['confirmed', 'active']) // Remove 'pending' since they don't reserve vehicle
-                ->whereIn('payment_status', ['paid', 'partial']) // Only check paid bookings
+                ->whereIn('status', ['confirmed', 'active'])
+                ->whereIn('payment_status', ['paid', 'partial'])
                 ->where(function ($query) use ($pickupDate, $returnDate) {
                     $query->whereBetween('pickup_datetime', [$pickupDate, $returnDate])
                             ->orWhereBetween('return_datetime', [$pickupDate, $returnDate])
@@ -215,214 +312,5 @@ class BookingController extends Controller {
                 ->exists();
 
         return !$overlappingBookings;
-    }
-
-   //Confirm booking
-
-    public function confirm($bookingId) {
-        $booking = Booking::where('id', $bookingId)
-                ->where('user_id', Auth::id())
-                ->firstOrFail();
-
-
-        if (!$booking->canTransitionTo('confirmed')) {
-            return back()->with('error', 'This booking cannot be confirmed in its current state.');
-        }
-
-        // Check if payment is still pending
-        if ($booking->payment_status === 'pending') {
-            return redirect()->route('payment.form', $booking->id)
-                            ->with('info', 'Please complete payment to confirm your booking.');
-        }
-
-        if ($booking->confirm()) {
-            return redirect()->route('booking.show', $booking->id)
-                            ->with('success', 'Booking confirmed successfully using State Pattern!');
-        } else {
-            return back()->with('error', 'Failed to confirm booking.');
-        }
-    }
-
-  //Export bookings to PDF for admin
-    public function export(Request $request)
-    {
-        // Get filters from request
-        $filters = [
-            'search' => $request->get('search'),
-            'status' => $request->get('status'),
-            'date_range' => $request->get('date_range'),
-            'sort' => $request->get('sort', 'newest')
-        ];
-        $query = Booking::with(['user', 'vehicle']);
-
-        // Apply search filter
-        if ($filters['search']) {
-            $query->whereHas('user', function($q) use ($filters) {
-                $q->where('name', 'like', '%' . $filters['search'] . '%')
-                  ->orWhere('email', 'like', '%' . $filters['search'] . '%');
-            })->orWhereHas('vehicle', function($q) use ($filters) {
-                $q->where('make', 'like', '%' . $filters['search'] . '%')
-                  ->orWhere('model', 'like', '%' . $filters['search'] . '%')
-                  ->orWhere('license_plate', 'like', '%' . $filters['search'] . '%');
-            });
-        }
-
-        // Apply status filter
-        if ($filters['status']) {
-            $query->where('status', $filters['status']);
-        }
-
-        // Apply date range filter
-        if ($filters['date_range']) {
-            switch ($filters['date_range']) {
-                case 'today':
-                    $query->whereDate('created_at', today());
-                    break;
-                case 'week':
-                    $query->whereBetween('created_at', [now()->startOfWeek(), now()->endOfWeek()]);
-                    break;
-                case 'month':
-                    $query->whereMonth('created_at', now()->month)
-                          ->whereYear('created_at', now()->year);
-                    break;
-                case 'year':
-                    $query->whereYear('created_at', now()->year);
-                    break;
-            }
-        }
-
-        // Apply sorting
-        switch ($filters['sort']) {
-            case 'oldest':
-                $query->oldest();
-                break;
-            case 'amount_high':
-                $query->orderBy('total_amount', 'desc');
-                break;
-            case 'amount_low':
-                $query->orderBy('total_amount', 'asc');
-                break;
-            default:
-                $query->latest();
-        }
-
-        $bookings = $query->get();
-
-        // Calculate statistics
-        $totalBookings = $bookings->count();
-        $pendingCount = $bookings->where('status', 'pending')->count();
-        $confirmedCount = $bookings->where('status', 'confirmed')->count();
-        $totalRevenue = $bookings->where('status', '!=', 'cancelled')->sum('total_amount');
-
-        $data = [
-            'bookings' => $bookings,
-            'totalBookings' => $totalBookings,
-            'pendingCount' => $pendingCount,
-            'confirmedCount' => $confirmedCount,
-            'totalRevenue' => $totalRevenue,
-            'exportDate' => \Carbon\Carbon::now('Asia/Kuala_Lumpur')->format('F d, Y \a\t g:i A'),
-            'filters' => array_filter($filters)
-        ];
-
-        $pdf = Pdf::loadView('admin.bookings-export', $data);
-
-        return $pdf->download('bookings-export-' . now()->format('Y-m-d') . '.pdf');
-    }
-
-    //State Pattern specific functionality
-
-    //Get booking state information
-    public function getStateInfo(Request $request) {
-        $bookingId = $request->get('booking_id');
-        $booking = Booking::findOrFail($bookingId);
-
-        return response()->json([
-            'current_state' => $booking->status,
-            'available_actions' => $booking->getAvailableActions(),
-            'can_transitions' => [
-                'confirmed' => $booking->canTransitionTo('confirmed'),
-                'active' => $booking->canTransitionTo('active'),
-                'completed' => $booking->canTransitionTo('completed'),
-                'cancelled' => $booking->canTransitionTo('cancelled')
-            ],
-            'state_message' => $booking->getStateMessage(),
-            'next_state' => $booking->getNextState(),
-            'requires_payment' => $booking->requiresPayment()
-        ]);
-    }
-
-    //Activate booking (mark as picked up)
-    public function activate($bookingId) {
-        $booking = Booking::where('id', $bookingId)
-                ->where('user_id', Auth::id())
-                ->firstOrFail();
-
-        if (!$booking->canTransitionTo('active')) {
-            return back()->with('error', 'This booking cannot be activated in its current state.');
-        }
-
-        if ($booking->activate()) {
-            return redirect()->route('booking.show', $booking->id)
-                            ->with('success', 'Booking activated! Vehicle pickup confirmed.');
-        } else {
-            return back()->with('error', 'Failed to activate booking.');
-        }
-    }
-
-     //Complete booking
-    public function complete($bookingId, Request $request) {
-        $booking = Booking::where('id', $bookingId)
-                ->where('user_id', Auth::id())
-                ->firstOrFail();
-
-        if (!$booking->canTransitionTo('completed')) {
-            return back()->with('error', 'This booking cannot be completed in its current state.');
-        }
-
-        $completionData = [
-            'actual_return_datetime' => now(),
-            'damage_charges' => $request->get('damage_charges', 0),
-            'late_fees' => $request->get('late_fees', 0)
-        ];
-
-        if ($booking->complete($completionData)) {
-            return redirect()->route('booking.show', $booking->id)
-                            ->with('success', 'Booking completed successfully! Thank you for choosing RentWheels.');
-        } else {
-            return back()->with('error', 'Failed to complete booking.');
-        }
-    }
-
-   //Get state workflow information
-    public function getStateWorkflow() {
-        $workflow = BookingStateManager::getStateWorkflow();
-        return response()->json(['workflow' => $workflow]);
-    }
-
-    //Bulk state transition (Admin functionality)
-    public function bulkStateTransition(Request $request) {
-        $validated = $request->validate([
-            'booking_ids' => 'required|array',
-            'new_state' => 'required|string|in:confirmed,active,completed,cancelled'
-        ]);
-
-        $bookings = Booking::whereIn('id', $validated['booking_ids'])->get();
-        $successCount = 0;
-        $errors = [];
-
-        foreach ($bookings as $booking) {
-            if ($booking->transitionTo($validated['new_state'])) {
-                $successCount++;
-            } else {
-                $errors[] = "Failed to transition booking {$booking->booking_number}";
-            }
-        }
-
-        $message = "Successfully transitioned {$successCount} booking(s) to {$validated['new_state']} state.";
-        if (!empty($errors)) {
-            $message .= " Errors: " . implode(', ', $errors);
-        }
-
-        return back()->with('success', $message);
     }
 }

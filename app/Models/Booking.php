@@ -4,7 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use App\Services\BookingStateManager; // NEW: Import the State Manager
+use App\State\StateFactory;
+use App\State\BookingState;
 use Carbon\Carbon;
 
 class Booking extends Model
@@ -50,7 +51,12 @@ class Booking extends Model
         'return_inspection' => 'array'
     ];
 
-    // Relationships - UNCHANGED
+    /**
+     * Cache for state object
+     */
+    private ?BookingState $stateObject = null;
+
+    // Relationships
     public function user()
     {
         return $this->belongsTo(User::class);
@@ -61,7 +67,7 @@ class Booking extends Model
         return $this->belongsTo(Vehicle::class);
     }
 
-    // Generate unique booking number - UNCHANGED
+    // Generate unique booking number
     public static function generateBookingNumber()
     {
         do {
@@ -71,13 +77,13 @@ class Booking extends Model
         return $number;
     }
 
-    // Calculate rental days - UNCHANGED
+    // Calculate rental days
     public function getRentalDaysAttribute()
     {
         return $this->pickup_datetime->diffInDays($this->return_datetime) ?: 1;
     }
 
-    // Calculate total cost - UNCHANGED
+    // Calculate total cost
     public function calculateTotalCost()
     {
         if (!$this->vehicle || !$this->vehicle->rentalRate) {
@@ -88,7 +94,7 @@ class Booking extends Model
         return $this->vehicle->rentalRate->calculateRate($days);
     }
 
-    // MODIFIED: Status check methods now use State Pattern
+    // Status check methods
     public function isPending()
     {
         return $this->status === 'pending';
@@ -114,33 +120,60 @@ class Booking extends Model
         return $this->status === 'cancelled';
     }
 
-    // NEW: State Pattern Methods
+    /**
+     * Get state object - uses State Pattern
+     */
+    public function getState(): BookingState
+    {
+        // Create new state object if status has changed or not cached
+        if (!$this->stateObject || $this->isDirty('status')) {
+            $this->stateObject = StateFactory::create($this);
+        }
+
+        return $this->stateObject;
+    }
 
     /**
      * Get available actions for this booking based on current state
-     * Uses State Pattern via BookingStateManager
      */
     public function getAvailableActions(): array
     {
-        return BookingStateManager::getAvailableActions($this);
+        return $this->getState()->getAvailableActions();
     }
 
     /**
      * Check if booking can transition to specific state
-     * Uses State Pattern for state validation
      */
     public function canTransitionTo(string $newState): bool
     {
-        return BookingStateManager::canTransitionTo($this, $newState);
+        return $this->getState()->canTransitionTo($newState);
     }
 
     /**
      * Transition to new state using State Pattern
-     * Replaces direct status updates with state-managed transitions
      */
     public function transitionTo(string $newState, array $data = []): bool
     {
-        return BookingStateManager::transitionTo($this, $newState, $data);
+        if (!$this->canTransitionTo($newState)) {
+            return false;
+        }
+
+        // Clear state cache to force recreation after transition
+        $this->stateObject = null;
+
+        // Call the appropriate transition method on state object
+        switch ($newState) {
+            case 'confirmed':
+                return $this->confirm();
+            case 'active':
+                return $this->activate();
+            case 'completed':
+                return $this->complete($data);
+            case 'cancelled':
+                return $this->cancel($data['reason'] ?? 'Cancelled by customer');
+            default:
+                return false;
+        }
     }
 
     /**
@@ -148,7 +181,7 @@ class Booking extends Model
      */
     public function getStateMessage(): string
     {
-        return BookingStateManager::getStateMessage($this);
+        return $this->getState()->getStateMessage();
     }
 
     /**
@@ -156,7 +189,7 @@ class Booking extends Model
      */
     public function requiresPayment(): bool
     {
-        return BookingStateManager::requiresPayment($this);
+        return $this->getState()->requiresPayment();
     }
 
     /**
@@ -164,55 +197,79 @@ class Booking extends Model
      */
     public function getNextState(): ?string
     {
-        return BookingStateManager::getNextState($this);
+        return $this->getState()->getNextState();
     }
 
-    // MODIFIED: Badge color methods now use State Pattern
+    /**
+     * Get badge colors using StateFactory
+     */
     public function getStatusBadgeColorAttribute()
     {
-        return BookingStateManager::getStatusBadgeColor($this->status);
+        return StateFactory::getStatusBadgeColor($this->status);
     }
 
     public function getPaymentBadgeColorAttribute()
     {
-        return BookingStateManager::getPaymentBadgeColor($this->payment_status);
+        return StateFactory::getPaymentBadgeColor($this->payment_status);
     }
 
-    // NEW: Convenience methods for common state transitions
+    /**
+     * Convenience methods for common state transitions
+     */
 
     /**
-     * Confirm this booking using State Pattern
+     * Confirm this booking
      */
     public function confirm(): bool
     {
-        return $this->transitionTo('confirmed');
+        $result = $this->getState()->confirm();
+        if ($result) {
+            $this->refresh(); // Refresh model to get updated status
+            $this->stateObject = null; // Clear cache
+        }
+        return $result;
     }
 
     /**
-     * Cancel this booking using State Pattern
+     * Cancel this booking
      */
     public function cancel(string $reason = 'Cancelled by customer'): bool
     {
-        return $this->transitionTo('cancelled', ['reason' => $reason]);
+        $result = $this->getState()->cancel($reason);
+        if ($result) {
+            $this->refresh();
+            $this->stateObject = null;
+        }
+        return $result;
     }
 
     /**
-     * Activate this booking (mark as picked up) using State Pattern
+     * Activate this booking (mark as picked up)
      */
     public function activate(): bool
     {
-        return $this->transitionTo('active');
+        $result = $this->getState()->activate();
+        if ($result) {
+            $this->refresh();
+            $this->stateObject = null;
+        }
+        return $result;
     }
 
     /**
-     * Complete this booking using State Pattern
+     * Complete this booking
      */
     public function complete(array $data = []): bool
     {
-        return $this->transitionTo('completed', $data);
+        $result = $this->getState()->complete($data);
+        if ($result) {
+            $this->refresh();
+            $this->stateObject = null;
+        }
+        return $result;
     }
 
-    // Scopes for easy querying - UNCHANGED but can now leverage state pattern
+    // Scopes for easy querying
     public function scopeActive($query)
     {
         return $query->whereIn('status', ['confirmed', 'active']);
@@ -233,14 +290,12 @@ class Booking extends Model
         return $query->where('vehicle_id', $vehicleId);
     }
 
-    // Check if booking overlaps with given dates - UNCHANGED
+    // Check if booking overlaps with given dates
     public function overlapsWithDates($pickupDate, $returnDate)
     {
         return $this->pickup_datetime <= $returnDate &&
                $this->return_datetime >= $pickupDate;
     }
-
-    // NEW: State Pattern Integration Events
 
     /**
      * Boot method to add model events for state transitions
@@ -255,11 +310,11 @@ class Booking extends Model
                 $oldStatus = $booking->getOriginal('status');
                 $newStatus = $booking->status;
 
-                // Validate state transition using State Pattern
-                if (!BookingStateManager::canTransitionTo(
-                    new static(['status' => $oldStatus]),
-                    $newStatus
-                )) {
+                // Create temporary booking with old status to check transition
+                $tempBooking = new static(['status' => $oldStatus]);
+                $tempState = StateFactory::create($tempBooking);
+
+                if (!$tempState->canTransitionTo($newStatus)) {
                     throw new \InvalidArgumentException(
                         "Invalid state transition from {$oldStatus} to {$newStatus}"
                     );
@@ -268,7 +323,7 @@ class Booking extends Model
         });
     }
 
-    // NEW: State-based query methods
+    // State-based query methods
 
     /**
      * Get bookings that can be confirmed
@@ -305,7 +360,7 @@ class Booking extends Model
                     ->where('return_datetime', '<=', now());
     }
 
-    // NEW: State Pattern utility methods
+    // State Pattern utility methods
 
     /**
      * Get all possible actions for any booking state
@@ -328,7 +383,7 @@ class Booking extends Model
      */
     public static function getStateWorkflow(): array
     {
-        return BookingStateManager::getStateWorkflow();
+        return StateFactory::getStateWorkflow();
     }
 
     /**
