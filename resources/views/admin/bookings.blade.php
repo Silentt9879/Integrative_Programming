@@ -1,0 +1,597 @@
+@extends('admin')
+
+@section('title', 'Bookings Management - RentWheels Admin')
+
+@section('content')
+<style>
+    body {
+        font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(135deg, #dc3545 0%, #6f42c1 50%, #fd7e14 100%);
+        min-height: 100vh;
+    }
+
+    .admin-container {
+        padding: 2rem 0;
+    }
+
+    .admin-card {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(20px);
+        border-radius: 20px;
+        box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        margin-bottom: 2rem;
+    }
+
+    .admin-header {
+        background: linear-gradient(135deg, #dc3545, #6f42c1);
+        color: white;
+        padding: 2rem;
+        border-radius: 20px 20px 0 0;
+        margin: -1px -1px 0 -1px;
+    }
+
+    .stats-row {
+        background: #f8f9fa;
+        border-radius: 15px;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .stat-card {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        text-align: center;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        transition: transform 0.3s ease;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-3px);
+    }
+
+    .stat-icon {
+        font-size: 2rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .customer-avatar {
+        width: 45px;
+        height: 45px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: bold;
+        margin-right: 0.75rem;
+    }
+
+    .status-badge {
+        padding: 0.4rem 0.8rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+
+    .status-confirmed {
+        background: linear-gradient(45deg, #28a745, #20c997);
+        color: white;
+    }
+    .status-pending {
+        background: linear-gradient(45deg, #ffc107, #fd7e14);
+        color: white;
+    }
+    .status-cancelled {
+        background: linear-gradient(45deg, #dc3545, #c82333);
+        color: white;
+    }
+    .status-completed {
+        background: linear-gradient(45deg, #6f42c1, #007bff);
+        color: white;
+    }
+
+    .action-btn {
+        padding: 0.4rem 0.8rem;
+        border-radius: 8px;
+        border: none;
+        margin: 0 0.2rem;
+        transition: all 0.3s ease;
+    }
+
+    .btn-view {
+        background: #17a2b8;
+        color: white;
+    }
+    .btn-view:hover {
+        background: #138496;
+        transform: translateY(-1px);
+    }
+
+    .search-filter-section {
+        background: white;
+        border-radius: 15px;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    }
+
+    .table-responsive {
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    }
+
+    .table thead th {
+        background: linear-gradient(135deg, #343a40, #495057);
+        color: white;
+        border: none;
+        padding: 1rem;
+        font-weight: 600;
+    }
+
+    .table tbody tr {
+        transition: all 0.3s ease;
+    }
+
+    .table tbody tr:hover {
+        background: rgba(0, 123, 255, 0.05);
+        transform: scale(1.01);
+    }
+
+    .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        display: none;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+    }
+
+    .loading-spinner {
+        color: white;
+        font-size: 3rem;
+    }
+
+    .modal-header {
+        background: linear-gradient(135deg, #dc3545, #6f42c1);
+        color: white;
+    }
+
+    .form-control:focus {
+        border-color: #dc3545;
+        box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
+    }
+
+    .vehicle-info {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .vehicle-icon {
+        width: 40px;
+        height: 40px;
+        background: linear-gradient(135deg, #28a745, #20c997);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+    }
+</style>
+
+<!-- Loading Overlay -->
+<div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-spinner">
+        <i class="fas fa-spinner fa-spin"></i>
+    </div>
+</div>
+
+<!-- Flash Messages -->
+@if(session('success'))
+<div class="container mt-3">
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="fas fa-check-circle me-2"></i>{{ session('success') }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+</div>
+@endif
+
+@if(session('error'))
+<div class="container mt-3">
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="fas fa-exclamation-circle me-2"></i>{{ session('error') }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+</div>
+@endif
+
+<!-- Admin Content -->
+<div class="admin-container">
+    <div class="container">
+        <!-- Header Card -->
+        <div class="admin-card">
+            <div class="admin-header">
+                <div class="row align-items-center">
+                    <div class="col-md-8">
+                        <h1 class="h2 mb-3">
+                            <i class="fas fa-calendar-check me-3"></i>
+                            Bookings Management
+                        </h1>
+                        <p class="lead mb-0">
+                            Monitor all vehicle bookings, manage rental status, and track customer reservations.
+                        </p>
+                    </div>
+                    <div class="col-md-4 text-center">
+                        <div class="display-1">
+                            <i class="fas fa-clipboard-list"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Booking Statistics -->
+            <div class="stats-row">
+                <div class="row g-4">
+                    <div class="col-md-3">
+                        <div class="stat-card">
+                            <div class="stat-icon text-primary">
+                                <i class="fas fa-calendar-check"></i>
+                            </div>
+                            <h4 id="totalBookings">{{ $totalBookings ?? 0 }}</h4>
+                            <p class="text-muted mb-0">Total Bookings</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="stat-card">
+                            <div class="stat-icon text-warning">
+                                <i class="fas fa-clock"></i>
+                            </div>
+                            <h4 id="pendingBookings">{{ $pendingBookings ?? 0 }}</h4>
+                            <p class="text-muted mb-0">Pending</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="stat-card">
+                            <div class="stat-icon text-success">
+                                <i class="fas fa-check-circle"></i>
+                            </div>
+                            <h4 id="confirmedBookings">{{ $confirmedBookings ?? 0 }}</h4>
+                            <p class="text-muted mb-0">Confirmed</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="stat-card">
+                            <div class="stat-icon text-info">
+                                <i class="fas fa-dollar-sign"></i>
+                            </div>
+                            <h4 id="totalRevenue">RM{{ number_format($totalRevenue ?? 0, 2) }}</h4>
+                            <p class="text-muted mb-0">Total Revenue</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Search and Filter Section -->
+            <div class="search-filter-section">
+                <form method="GET" action="{{ route('admin.bookings') }}" id="filterForm">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-md-3">
+                            <label for="search" class="form-label">Search Bookings</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-search"></i></span>
+                                <input type="text" class="form-control" id="search" name="search" 
+                                       placeholder="Customer name, vehicle..." 
+                                       value="{{ request('search') }}">
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <label for="status" class="form-label">Status</label>
+                            <select class="form-select" id="status" name="status">
+                                <option value="">All Status</option>
+                                <option value="pending" {{ request('status') == 'pending' ? 'selected' : '' }}>Pending</option>
+                                <option value="confirmed" {{ request('status') == 'confirmed' ? 'selected' : '' }}>Confirmed</option>
+                                <option value="completed" {{ request('status') == 'completed' ? 'selected' : '' }}>Completed</option>
+                                <option value="cancelled" {{ request('status') == 'cancelled' ? 'selected' : '' }}>Cancelled</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label for="date_range" class="form-label">Date Range</label>
+                            <select class="form-select" id="date_range" name="date_range">
+                                <option value="">All Dates</option>
+                                <option value="today" {{ request('date_range') == 'today' ? 'selected' : '' }}>Today</option>
+                                <option value="week" {{ request('date_range') == 'week' ? 'selected' : '' }}>This Week</option>
+                                <option value="month" {{ request('date_range') == 'month' ? 'selected' : '' }}>This Month</option>
+                                <option value="year" {{ request('date_range') == 'year' ? 'selected' : '' }}>This Year</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label for="sort" class="form-label">Sort By</label>
+                            <select class="form-select" id="sort" name="sort">
+                                <option value="newest" {{ request('sort') == 'newest' ? 'selected' : '' }}>Newest First</option>
+                                <option value="oldest" {{ request('sort') == 'oldest' ? 'selected' : '' }}>Oldest First</option>
+                                <option value="amount_high" {{ request('sort') == 'amount_high' ? 'selected' : '' }}>Amount: High to Low</option>
+                                <option value="amount_low" {{ request('sort') == 'amount_low' ? 'selected' : '' }}>Amount: Low to High</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="d-flex gap-2">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-filter me-1"></i>Filter
+                                </button>
+                                <a href="{{ route('admin.bookings') }}" class="btn btn-outline-secondary">
+                                    <i class="fas fa-times me-1"></i>Clear
+                                </a>
+                                <a href="{{ route('admin.bookings.export') }}" class="btn btn-success ms-auto">
+                                    <i class="fas fa-download me-1"></i>Export PDF
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Bookings Table -->
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Booking ID</th>
+                            <th>Customer</th>
+                            <th>Vehicle</th>
+                            <th>Booking Period</th>
+                            <th>Amount</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($bookings ?? [] as $booking)
+                        <tr id="booking-row-{{ $booking->id ?? rand(1,999) }}">
+                            <td>
+                                <strong>#BK{{ str_pad($booking->id ?? rand(1,999), 4, '0', STR_PAD_LEFT) }}</strong>
+                                <br>
+                                <small class="text-muted">{{ $booking->created_at ?? now()->format('M d, Y') }}</small>
+                            </td>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <div class="customer-avatar">
+                                        {{ strtoupper(substr($booking->user->name ?? 'Adam', 0, 1)) }}
+                                    </div>
+                                    <div>
+                                        <strong>{{ $booking->user->name ?? 'Adam' }}</strong>
+                                        <br>
+                                        <small class="text-muted">{{ $booking->user->email ?? 'adam@gmail.com' }}</small>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="vehicle-info">
+                                    <div class="vehicle-icon">
+                                        <i class="fas fa-car"></i>
+                                    </div>
+                                    <div>
+                                        <strong>{{ $booking->vehicle->make ?? 'Perodua' }} {{ $booking->vehicle->model ?? 'Myvi' }}</strong>
+                                        <br>
+                                        <small class="text-muted">{{ $booking->vehicle->license_plate ?? 'ABC123' }}</small>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <strong>{{ $booking->start_date ?? now()->format('M d, Y') }}</strong>
+                                <br>
+                                <small class="text-muted">to {{ $booking->end_date ?? now()->addDays(3)->format('M d, Y') }}</small>
+                                <br>
+                            </td>
+                            <td>
+                                <h5 class="text-success mb-0">RM{{ number_format($booking->total_amount ?? 369, 2) }}</h5>
+                            </td>
+                            <td>
+                                <span class="status-badge status-{{ strtolower($booking->status ?? 'pending') }}" id="booking-status-{{ $booking->id ?? rand(1,999) }}">
+                                    {{ ucfirst($booking->status ?? 'Pending') }}
+                                </span>
+                            </td>
+                            <td>
+                                <div class="d-flex flex-wrap gap-1">
+                                    <button class="action-btn btn-view" onclick="viewBooking({{ $booking->id ?? rand(1,999) }})" title="View Details">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        @empty
+                        <!-- Sample data for demonstration -->
+                        <tr id="booking-row-1">
+                            <td>
+                                <strong>#BK0001</strong>
+                                <br>
+                                <small class="text-muted">{{ now()->subHours(3)->format('M d, Y') }}</small>
+                            </td>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <div class="customer-avatar">A</div>
+                                    <div>
+                                        <strong>Adam</strong>
+                                        <br>
+                                        <small class="text-muted">adam@gmail.com</small>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="vehicle-info">
+                                    <div class="vehicle-icon">
+                                        <i class="fas fa-car"></i>
+                                    </div>
+                                    <div>
+                                        <strong>Perodua Myvi</strong>
+                                        <br>
+                                        <small class="text-muted">ABC123</small>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <strong>{{ now()->format('M d, Y') }}</strong>
+                                <br>
+                                <small class="text-muted">to {{ now()->addDays(3)->format('M d, Y') }}</small>
+                                <br>
+                            </td>
+                            <td>
+                                <h5 class="text-success mb-0">RM369.00</h5>
+                            </td>
+                            <td>
+                                <span class="status-badge status-pending" id="booking-status-1">
+                                    Pending
+                                </span>
+                            </td>
+                            <td>
+                                <div class="d-flex flex-wrap gap-1">
+                                    <button class="action-btn btn-view" onclick="viewBooking(1)" title="View Details">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <div class="p-3 d-flex justify-content-between align-items-center">
+                <small class="text-muted">
+                    Showing {{ $bookings->firstItem() ?? 1 }} to {{ $bookings->lastItem() ?? 1 }} of {{ $bookings->total() ?? 1 }} results
+                </small>
+                {{ $bookings->appends(request()->query())->links() ?? '' }}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- View Booking Details Modal -->
+<div class="modal fade" id="viewBookingModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-eye me-2"></i>Booking Details
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="bookingDetailsContent">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function showLoading() {
+    document.getElementById('loadingOverlay').style.display = 'flex';
+    }
+
+    function hideLoading() {
+    document.getElementById('loadingOverlay').style.display = 'none';
+    }
+
+    function viewBooking(id) {
+    showLoading();
+    setTimeout(() => {
+    hideLoading();
+    const bookingDetails = `
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Booking Information</h6>
+                        <p><strong>Booking ID:</strong> #BK${String(id).padStart(4, '0')}</p>
+                        <p><strong>Customer:</strong> Adam</p>
+                        <p><strong>Email:</strong> adam@gmail.com</p>
+                        <p><strong>Phone:</strong> +60123456789</p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Vehicle Information</h6>
+                        <p><strong>Vehicle:</strong> Perodua Myvi</p>
+                        <p><strong>License Plate:</strong> ABC123</p>
+                        <p><strong>Type:</strong> Economy</p>
+                        <p><strong>Daily Rate:</strong> RM123.00</p>
+                    </div>
+                </div>
+                <hr>
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Rental Period</h6>
+                        <p><strong>Start Date:</strong> ${new Date().toLocaleDateString()}</p>
+                        <p><strong>End Date:</strong> ${new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toLocaleDateString()}</p>
+                        <p><strong>Duration:</strong> 3 days</p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Payment Information</h6>
+                        <p><strong>Subtotal:</strong> RM369.00</p>
+                        <p><strong>Tax:</strong> RM36.90</p>
+                        <p><strong>Total Amount:</strong> <span class="text-success">RM405.90</span></p>
+                    </div>
+                </div>
+            `;
+    document.getElementById('bookingDetailsContent').innerHTML = bookingDetails;
+    const modal = new bootstrap.Modal(document.getElementById('viewBookingModal'));
+    modal.show();
+    }, 800);
+    }
+
+    function exportBookings() {
+    showLoading();
+    const search = document.getElementById('search').value;
+    const status = document.getElementById('status').value;
+    const dateRange = document.getElementById('date_range').value;
+    const sort = document.getElementById('sort').value;
+    let exportUrl = '{{ route("admin.bookings.export") }}?';
+    const params = new URLSearchParams();
+    if (search) params.append('search', search);
+    if (status) params.append('status', status);
+    if (dateRange) params.append('date_range', dateRange);
+    if (sort) params.append('sort', sort);
+    exportUrl += params.toString();
+    const link = document.createElement('a');
+    link.href = exportUrl;
+    link.download = `bookings-export-${new Date().toISOString().split('T')[0]}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    hideLoading();
+    showAlert('PDF export started! Check your downloads folder.', 'success');
+    }
+
+    function showAlert(message, type) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+    alertDiv.innerHTML = `
+            <i class="fas fa-check-circle me-2"></i>${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+    const container = document.querySelector('.container');
+    container.insertBefore(alertDiv, container.firstChild);
+    setTimeout(() => {
+    alertDiv.remove();
+    }, 5000);
+    }
+
+    document.getElementById('status').addEventListener('change', function() {
+    document.getElementById('filterForm').submit();
+    });
+    document.getElementById('date_range').addEventListener('change', function() {
+    document.getElementById('filterForm').submit();
+    });
+    document.getElementById('sort').addEventListener('change', function() {
+    document.getElementById('filterForm').submit();
+    });
+</script>
+@endsection
