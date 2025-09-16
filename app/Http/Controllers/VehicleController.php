@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Vehicle;
 use App\Models\RentalRate;
-use App\Services\VehicleFactory; // NEW: Import the Factory Service
+use App\Factory\VehicleFactoryRegistry; // NEW: Use Factory Method Pattern
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -47,7 +47,7 @@ class VehicleController extends Controller {
         return view('vehicles.create');
     }
 
-    //Store a newly created vehicle in storage
+    //Store a newly created vehicle in storage using Factory Method Pattern
     public function store(Request $request) {
         $validated = $request->validate([
             'license_plate' => 'required|string|max:20|unique:vehicles,license_plate',
@@ -73,14 +73,25 @@ class VehicleController extends Controller {
             $imagePath = $request->file('image')->store('vehicles', 'public');
             $validated['image_url'] = '/storage/' . $imagePath;
         } elseif ($request->filled('image_url')) {
-
             $validated['image_url'] = $request->image_url;
         }
 
-        $vehicle = VehicleFactory::createVehicle($validated);
+        // NEW: Use Factory Method Pattern
+        try {
+            $creator = VehicleFactoryRegistry::getCreator($validated['type']);
+            $vehicle = $creator->processVehicle($validated);
 
-        return redirect()->route('admin.vehicles')
-                        ->with('success', 'Vehicle added successfully using Factory Method Pattern!');
+            return redirect()->route('admin.vehicles')
+                            ->with('success', 'Vehicle added successfully using Factory Method Pattern!');
+        } catch (\InvalidArgumentException $e) {
+            return redirect()->back()
+                            ->withErrors(['type' => 'Unsupported vehicle type: ' . $validated['type']])
+                            ->withInput();
+        } catch (\Exception $e) {
+            return redirect()->back()
+                            ->withErrors(['error' => 'Failed to create vehicle: ' . $e->getMessage()])
+                            ->withInput();
+        }
     }
 
     //Display the specified car
@@ -137,14 +148,25 @@ class VehicleController extends Controller {
             $validated['image_url'] = $request->image_url;
         }
 
-        $vehicle = VehicleFactory::updateVehicle($vehicle, $validated);
+        // NEW: Use Factory Method Pattern for updates
+        try {
+            $creator = VehicleFactoryRegistry::getCreator($validated['type']);
+            $vehicle = $creator->updateVehicle($vehicle, $validated);
 
-        return redirect()->route('admin.vehicles')
-                        ->with('success', 'Vehicle updated successfully using Factory Method Pattern!');
+            return redirect()->route('admin.vehicles')
+                            ->with('success', 'Vehicle updated successfully using Factory Method Pattern!');
+        } catch (\InvalidArgumentException $e) {
+            return redirect()->back()
+                            ->withErrors(['type' => 'Unsupported vehicle type: ' . $validated['type']])
+                            ->withInput();
+        } catch (\Exception $e) {
+            return redirect()->back()
+                            ->withErrors(['error' => 'Failed to update vehicle: ' . $e->getMessage()])
+                            ->withInput();
+        }
     }
 
  //Remove the specified vehicle from storage
-
     public function destroy($id) {
         $vehicle = Vehicle::findOrFail($id);
 
@@ -182,16 +204,19 @@ class VehicleController extends Controller {
                         ->with('success', 'Vehicle status updated to ' . $newStatus . '!');
     }
 
-
+    // NEW: Updated to use Factory Method Pattern
     public function getTypeDefaults(Request $request) {
         $type = $request->get('type');
 
-        if (!in_array($type, VehicleFactory::getSupportedTypes())) {
+        if (!VehicleFactoryRegistry::isSupported($type)) {
             return response()->json(['error' => 'Unsupported vehicle type'], 400);
         }
 
-        $defaults = VehicleFactory::getTypeDefaults($type);
-
-        return response()->json(['defaults' => $defaults]);
+        try {
+            $defaults = VehicleFactoryRegistry::getTypeDefaults($type);
+            return response()->json(['defaults' => $defaults]);
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Failed to get type defaults: ' . $e->getMessage()], 500);
+        }
     }
 }

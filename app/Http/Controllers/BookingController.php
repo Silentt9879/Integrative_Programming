@@ -12,10 +12,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 
 class BookingController extends Controller {
 
-    /**
-     * Display user's bookings
-     * UNCHANGED - maintains existing functionality
-     */
+//Display user's bookings
     public function index() {
         $user = Auth::user();
 
@@ -27,10 +24,7 @@ class BookingController extends Controller {
         return view('booking.index', compact('bookings'));
     }
 
-    /**
-     * Show booking form for a specific vehicle
-     * UNCHANGED - maintains existing functionality
-     */
+    //Show booking form for a specific vehicle
     public function create($vehicleId) {
         $vehicle = Vehicle::with('rentalRate')->findOrFail($vehicleId);
 
@@ -43,10 +37,7 @@ class BookingController extends Controller {
         return view('booking.create', compact('vehicle'));
     }
 
-    /**
-     * Store a new booking
-     * MODIFIED - now creates booking in 'pending' state using State Pattern
-     */
+    //Store a new booking
     public function store(Request $request) {
         $validated = $request->validate([
             'vehicle_id' => 'required|exists:vehicles,id',
@@ -69,18 +60,18 @@ class BookingController extends Controller {
         $returnDateTime = Carbon::createFromFormat('Y-m-d H:i',
                 $validated['return_date'] . ' ' . $validated['return_time']);
 
-        // Check vehicle availability for these dates
+        // Check vehicle availability for dates
         if (!$this->isVehicleAvailable($vehicle->id, $pickupDateTime, $returnDateTime)) {
             return back()->withErrors(['dates' => 'Vehicle is not available for the selected dates.'])
                             ->withInput();
         }
 
-        // Calculate total cost
+        // Cal total cost
         $days = $pickupDateTime->diffInDays($returnDateTime) ?: 1;
         $totalAmount = $vehicle->rentalRate->calculateRate($days);
         $depositAmount = $totalAmount * 0.3; // 30% deposit
 
-        // NEW: Create booking in 'pending' state (State Pattern)
+        //Create booking in 'pending' state (State Pattern)
         $booking = Booking::create([
             'customer_name' => $user->name,
             'customer_email' => $user->email,
@@ -99,18 +90,12 @@ class BookingController extends Controller {
             'special_requests' => $validated['special_requests']
         ]);
 
-        // DON'T change vehicle status yet - State Pattern manages this
-        // Vehicle status will be changed when booking transitions to 'confirmed'
-
         // Redirect to payment instead of confirmation
         return redirect()->route('payment.form', $booking->id)
                         ->with('success', 'Booking created using State Pattern! Please complete payment to confirm.');
     }
 
-    /**
-     * Show booking confirmation page
-     * UNCHANGED - maintains existing functionality
-     */
+    //Show booking confirmation page
     public function confirmation($bookingId) {
         $booking = Booking::with(['vehicle', 'vehicle.rentalRate'])
                 ->where('id', $bookingId)
@@ -120,17 +105,15 @@ class BookingController extends Controller {
         return view('booking.confirmation', compact('booking'));
     }
 
-    /**
-     * Show specific booking details
-     * ENHANCED - now includes state-specific information
-     */
+//Show specific booking details
+
     public function show($bookingId) {
         $booking = Booking::with(['vehicle', 'vehicle.rentalRate'])
                 ->where('id', $bookingId)
                 ->where('user_id', Auth::id())
                 ->firstOrFail();
 
-        // NEW: Get available actions using State Pattern
+        //Get available actions using State Pattern
         $availableActions = $booking->getAvailableActions();
         $stateMessage = $booking->getStateMessage();
         $nextState = $booking->getNextState();
@@ -138,21 +121,19 @@ class BookingController extends Controller {
         return view('booking.show', compact('booking', 'availableActions', 'stateMessage', 'nextState'));
     }
 
-    /**
-     * Cancel a booking
-     * MODIFIED - now uses State Pattern for cancellation
-     */
+ //Cancel a booking
+
     public function cancel($bookingId) {
         $booking = Booking::where('id', $bookingId)
                 ->where('user_id', Auth::id())
                 ->firstOrFail();
 
-        // NEW: Use State Pattern to check if cancellation is allowed
+
         if (!$booking->canTransitionTo('cancelled')) {
             return back()->with('error', 'This booking cannot be cancelled in its current state.');
         }
 
-        // NEW: Use State Pattern to cancel booking
+        //Use State Pattern to cancel booking
         if ($booking->cancel('Cancelled by customer')) {
             return redirect()->route('booking.index')
                             ->with('success', 'Booking cancelled successfully using State Pattern.');
@@ -161,10 +142,8 @@ class BookingController extends Controller {
         }
     }
 
-    /**
-     * Check vehicle availability
-     * UNCHANGED - maintains existing functionality
-     */
+// Check vehicle availability
+
     public function checkAvailability(Request $request) {
         $request->validate([
             'vehicle_id' => 'required|exists:vehicles,id',
@@ -183,10 +162,8 @@ class BookingController extends Controller {
         ]);
     }
 
-    /**
-     * Vehicle availability search
-     * UNCHANGED - maintains existing functionality
-     */
+    //Vehicle availability search
+
     public function search(Request $request) {
         $validated = $request->validate([
             'pickup_date' => 'required|date|after_or_equal:today',
@@ -216,18 +193,12 @@ class BookingController extends Controller {
         return view('booking.search', compact('availableVehicles', 'pickupDate', 'returnDate', 'validated'));
     }
 
-    /**
-     * Show search form
-     * UNCHANGED - maintains existing functionality
-     */
+    //Show search form
     public function searchForm() {
         return view('booking.search-form');
     }
 
-    /**
-     * Private method to check vehicle availability
-     * UNCHANGED - maintains existing functionality
-     */
+    //Private method to check vehicle availability
     private function isVehicleAvailable($vehicleId, $pickupDate, $returnDate) {
         // Check for overlapping bookings
         $overlappingBookings = Booking::where('vehicle_id', $vehicleId)
@@ -246,16 +217,14 @@ class BookingController extends Controller {
         return !$overlappingBookings;
     }
 
-    /**
-     * Confirm booking
-     * MODIFIED - now uses State Pattern
-     */
+   //Confirm booking
+
     public function confirm($bookingId) {
         $booking = Booking::where('id', $bookingId)
                 ->where('user_id', Auth::id())
                 ->firstOrFail();
 
-        // NEW: Use State Pattern to check if confirmation is allowed
+
         if (!$booking->canTransitionTo('confirmed')) {
             return back()->with('error', 'This booking cannot be confirmed in its current state.');
         }
@@ -266,7 +235,6 @@ class BookingController extends Controller {
                             ->with('info', 'Please complete payment to confirm your booking.');
         }
 
-        // NEW: Use State Pattern to confirm booking
         if ($booking->confirm()) {
             return redirect()->route('booking.show', $booking->id)
                             ->with('success', 'Booking confirmed successfully using State Pattern!');
@@ -275,10 +243,7 @@ class BookingController extends Controller {
         }
     }
 
-    /**
-     * Export bookings to PDF for admin
-     * UNCHANGED - maintains existing functionality
-     */
+  //Export bookings to PDF for admin
     public function export(Request $request)
     {
         // Get filters from request
@@ -288,8 +253,6 @@ class BookingController extends Controller {
             'date_range' => $request->get('date_range'),
             'sort' => $request->get('sort', 'newest')
         ];
-
-        // Apply the same filtering logic as your main bookings method
         $query = Booking::with(['user', 'vehicle']);
 
         // Apply search filter
@@ -366,11 +329,9 @@ class BookingController extends Controller {
         return $pdf->download('bookings-export-' . now()->format('Y-m-d') . '.pdf');
     }
 
-    // NEW METHODS: State Pattern specific functionality
+    //State Pattern specific functionality
 
-    /**
-     * Get booking state information (AJAX endpoint)
-     */
+    //Get booking state information
     public function getStateInfo(Request $request) {
         $bookingId = $request->get('booking_id');
         $booking = Booking::findOrFail($bookingId);
@@ -390,9 +351,7 @@ class BookingController extends Controller {
         ]);
     }
 
-    /**
-     * Activate booking (mark as picked up)
-     */
+    //Activate booking (mark as picked up)
     public function activate($bookingId) {
         $booking = Booking::where('id', $bookingId)
                 ->where('user_id', Auth::id())
@@ -410,9 +369,7 @@ class BookingController extends Controller {
         }
     }
 
-    /**
-     * Complete booking
-     */
+     //Complete booking
     public function complete($bookingId, Request $request) {
         $booking = Booking::where('id', $bookingId)
                 ->where('user_id', Auth::id())
@@ -436,17 +393,13 @@ class BookingController extends Controller {
         }
     }
 
-    /**
-     * Get state workflow information
-     */
+   //Get state workflow information
     public function getStateWorkflow() {
         $workflow = BookingStateManager::getStateWorkflow();
         return response()->json(['workflow' => $workflow]);
     }
 
-    /**
-     * Bulk state transition (Admin functionality)
-     */
+    //Bulk state transition (Admin functionality)
     public function bulkStateTransition(Request $request) {
         $validated = $request->validate([
             'booking_ids' => 'required|array',

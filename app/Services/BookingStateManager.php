@@ -5,16 +5,10 @@ namespace App\Services;
 use App\Models\Booking;
 use App\Models\Vehicle;
 
-/**
- * Simple Booking State Manager implementing State Pattern
- * Manages booking state transitions and state-specific behaviors
- */
+//Manages booking state
 class BookingStateManager
 {
-    /**
-     * Get available actions for a booking based on its current state
-     * This is the core State Pattern implementation
-     */
+   // available actions for a booking
     public static function getAvailableActions(Booking $booking): array
     {
         switch ($booking->status) {
@@ -38,9 +32,7 @@ class BookingStateManager
         }
     }
 
-    /**
-     * Check if booking can transition to a specific state
-     */
+   //Check if booking can transition
     public static function canTransitionTo(Booking $booking, string $newState): bool
     {
         $currentState = $booking->status;
@@ -63,16 +55,13 @@ class BookingStateManager
         }
     }
 
-    /**
-     * Transition booking to new state with state-specific logic
-     */
+    //Transition booking to new state with state-specific logic
     public static function transitionTo(Booking $booking, string $newState, array $data = []): bool
     {
         if (!self::canTransitionTo($booking, $newState)) {
             return false;
         }
 
-        // Execute state-specific transition logic
         switch ($newState) {
             case 'confirmed':
                 return self::transitionToConfirmed($booking, $data);
@@ -91,9 +80,7 @@ class BookingStateManager
         }
     }
 
-    /**
-     * Get state-specific badge color
-     */
+    //Get state color
     public static function getStatusBadgeColor(string $status): string
     {
         switch ($status) {
@@ -114,9 +101,7 @@ class BookingStateManager
         }
     }
 
-    /**
-     * Get payment status badge color
-     */
+    //Get payment status color
     public static function getPaymentBadgeColor(string $paymentStatus): string
     {
         switch ($paymentStatus) {
@@ -135,9 +120,7 @@ class BookingStateManager
         }
     }
 
-    /**
-     * Get state-specific message for user
-     */
+    //Get state message for user
     public static function getStateMessage(Booking $booking): string
     {
         switch ($booking->status) {
@@ -161,18 +144,14 @@ class BookingStateManager
         }
     }
 
-    /**
-     * Check if booking requires payment
-     */
+    //Check if booking requires payment
     public static function requiresPayment(Booking $booking): bool
     {
         return in_array($booking->status, ['pending', 'confirmed']) &&
                $booking->payment_status === 'pending';
     }
 
-    /**
-     * Get next logical state for booking
-     */
+    //Get next state for booking
     public static function getNextState(Booking $booking): ?string
     {
         switch ($booking->status) {
@@ -189,9 +168,7 @@ class BookingStateManager
 
     // PRIVATE METHODS - State-specific logic
 
-    /**
-     * Get available actions for pending bookings
-     */
+   //Get available pending bookings
     private static function getPendingActions(Booking $booking): array
     {
         $actions = ['view', 'cancel'];
@@ -205,19 +182,17 @@ class BookingStateManager
         return $actions;
     }
 
-    /**
-     * Get available actions for confirmed bookings
-     */
+    //Get available confirmed bookings
     private static function getConfirmedActions(Booking $booking): array
     {
         $actions = ['view'];
 
-        // Can cancel if pickup date is more than 24 hours away
+        // cancel pickup date is more than 24 hours away
         if ($booking->pickup_datetime->diffInHours(now()) > 24) {
             $actions[] = 'cancel';
         }
 
-        // Can activate if pickup date has arrived
+        // activate if pickup date has arrived
         if ($booking->pickup_datetime <= now()) {
             $actions[] = 'activate';
         }
@@ -225,9 +200,7 @@ class BookingStateManager
         return $actions;
     }
 
-    /**
-     * Get available actions for active bookings
-     */
+    //Get available actions for active booking
     private static function getActiveActions(Booking $booking): array
     {
         $actions = ['view'];
@@ -240,25 +213,19 @@ class BookingStateManager
         return $actions;
     }
 
-    /**
-     * Get available actions for completed bookings
-     */
+    //Get available actions completed bookings
     private static function getCompletedActions(Booking $booking): array
     {
         return ['view'];
     }
 
-    /**
-     * Get available actions for cancelled bookings
-     */
+    //Get available actions cancelled bookings
     private static function getCancelledActions(Booking $booking): array
     {
         return ['view'];
     }
 
-    /**
-     * Transition to confirmed state
-     */
+    //Transition to confirm state
     private static function transitionToConfirmed(Booking $booking, array $data = []): bool
     {
         $booking->update([
@@ -266,7 +233,7 @@ class BookingStateManager
             'payment_status' => $booking->payment_status === 'pending' ? 'paid' : $booking->payment_status
         ]);
 
-        // Update vehicle status when booking is confirmed
+        // Update status when booking confirmed
         if ($booking->vehicle) {
             $booking->vehicle->update(['status' => 'rented']);
         }
@@ -274,9 +241,7 @@ class BookingStateManager
         return true;
     }
 
-    /**
-     * Transition to active state
-     */
+    //Transition to active state
     private static function transitionToActive(Booking $booking, array $data = []): bool
     {
         $booking->update([
@@ -288,9 +253,7 @@ class BookingStateManager
         return true;
     }
 
-    /**
-     * Transition to completed state
-     */
+    //Transition to completed state
     private static function transitionToCompleted(Booking $booking, array $data = []): bool
     {
         $updateData = [
@@ -298,7 +261,6 @@ class BookingStateManager
             'actual_return_datetime' => $data['actual_return_datetime'] ?? now(),
         ];
 
-        // Add any additional charges if provided
         if (isset($data['damage_charges'])) {
             $updateData['damage_charges'] = $data['damage_charges'];
         }
@@ -321,9 +283,7 @@ class BookingStateManager
         return true;
     }
 
-    /**
-     * Transition to cancelled state
-     */
+    //Transition to cancelled state
     private static function transitionToCancelled(Booking $booking, array $data = []): bool
     {
         $booking->update([
@@ -340,25 +300,19 @@ class BookingStateManager
         return true;
     }
 
-    /**
-     * Get all valid booking states
-     */
+    //Get all valid booking states
     public static function getAllStates(): array
     {
         return ['pending', 'confirmed', 'active', 'completed', 'cancelled', 'no_show'];
     }
 
-    /**
-     * Check if state is valid
-     */
+   //state is valid ?
     public static function isValidState(string $state): bool
     {
         return in_array($state, self::getAllStates());
     }
 
-    /**
-     * Get state workflow description
-     */
+   //Get state description
     public static function getStateWorkflow(): array
     {
         return [
