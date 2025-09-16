@@ -8,7 +8,7 @@ class CompletedState extends BookingState
 {
     public function getAvailableActions(): array
     {
-        return ['view']; // Only viewing is allowed for completed bookings
+        return ['view']; // can viewing completed bookings
     }
 
     public function getStateMessage(): string
@@ -23,19 +23,17 @@ class CompletedState extends BookingState
 
     public function requiresPayment(): bool
     {
-        return false; // All payments should be settled
+        return false; // pay all
     }
 
     public function getNextState(): ?string
     {
-        return null; // Terminal state
+        return null;
     }
 
     protected function getAllowedTransitions(): array
     {
-        return []; // No transitions allowed from completed state
+        return [];
     }
 
-    // No state transitions allowed from completed state
-    // All transition methods return false by default from parent class
 }

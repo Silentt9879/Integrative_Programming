@@ -4,16 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Models\Booking;
 use App\Models\Vehicle;
-use App\State\StateFactory; // Add this import
+use App\State\StateFactory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
 
 class BookingController extends Controller {
 
-    /**
-     * Display user's bookings
-     */
+    //display booking
     public function index() {
         $user = Auth::user();
 
@@ -25,9 +23,7 @@ class BookingController extends Controller {
         return view('booking.index', compact('bookings'));
     }
 
-    /**
-     * Show booking form for a specific vehicle
-     */
+    //show booking list
     public function create($vehicleId) {
         $vehicle = Vehicle::with('rentalRate')->findOrFail($vehicleId);
 

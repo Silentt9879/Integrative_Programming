@@ -7,9 +7,7 @@ use InvalidArgumentException;
 
 class StateFactory
 {
-    /**
-     * Create appropriate state object based on booking status
-     */
+   //create booking
     public static function create(Booking $booking): BookingState
     {
         switch ($booking->status) {
@@ -33,9 +31,7 @@ class StateFactory
         }
     }
 
-    /**
-     * Get all available states
-     */
+    //Get all available states
     public static function getAllStates(): array
     {
         return [
@@ -47,17 +43,13 @@ class StateFactory
         ];
     }
 
-    /**
-     * Check if a state is valid
-     */
+//state is valid?
     public static function isValidState(string $state): bool
     {
         return in_array($state, self::getAllStates());
     }
 
-    /**
-     * Get state workflow description
-     */
+   //state workflow description
     public static function getStateWorkflow(): array
     {
         return [
@@ -89,9 +81,7 @@ class StateFactory
         ];
     }
 
-    /**
-     * Get badge color for status
-     */
+    //status color
     public static function getStatusBadgeColor(string $status): string
     {
         $colors = [
@@ -105,9 +95,7 @@ class StateFactory
         return $colors[$status] ?? 'secondary';
     }
 
-    /**
-     * Get badge color for payment status
-     */
+//color payment status
     public static function getPaymentBadgeColor(string $paymentStatus): string
     {
         $colors = [

@@ -8,7 +8,7 @@ class CancelledState extends BookingState
 {
     public function getAvailableActions(): array
     {
-        return ['view']; // Only viewing is allowed for cancelled bookings
+        return ['view']; // if cancel only can view
     }
 
     public function getStateMessage(): string
@@ -22,21 +22,20 @@ class CancelledState extends BookingState
         return 'danger';
     }
 
+    //if cancel no need to pay
     public function requiresPayment(): bool
     {
-        return false; // No payment needed for cancelled bookings
+        return false;
     }
 
     public function getNextState(): ?string
     {
-        return null; // Terminal state
+        return null;
     }
 
     protected function getAllowedTransitions(): array
     {
-        return []; // No transitions allowed from cancelled state
+        return [];
     }
 
-    // No state transitions allowed from cancelled state
-    // All transition methods return false by default from parent class
 }

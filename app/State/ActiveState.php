@@ -32,7 +32,7 @@ class ActiveState extends BookingState
 
     public function requiresPayment(): bool
     {
-        return false; // Payment already handled
+        return false;
     }
 
     public function getNextState(): ?string
@@ -56,7 +56,7 @@ class ActiveState extends BookingState
             'actual_return_datetime' => $data['actual_return_datetime'] ?? now(),
         ];
 
-        // Calculate late fees if returned late
+        // Cal late fees if returned late
         $actualReturn = $data['actual_return_datetime'] ?? now();
         if ($actualReturn > $this->booking->return_datetime && $this->booking->vehicle->rentalRate) {
             $hoursLate = $this->booking->return_datetime->diffInHours($actualReturn);
@@ -64,12 +64,12 @@ class ActiveState extends BookingState
             $updateData['late_fees'] = $lateFee;
         }
 
-        // Add any damage charges
+        // damage charges
         if (isset($data['damage_charges'])) {
             $updateData['damage_charges'] = $data['damage_charges'];
         }
 
-        // Calculate final amount
+        // Cal final amount
         $finalAmount = $this->booking->total_amount +
                       ($updateData['late_fees'] ?? 0) +
                       ($updateData['damage_charges'] ?? 0);

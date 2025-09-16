@@ -13,89 +13,63 @@ abstract class BookingState
         $this->booking = $booking;
     }
 
-    /**
-     * Get available actions for current state
-     */
+   //check current state
     abstract public function getAvailableActions(): array;
 
-    /**
-     * Get state message for user
-     */
+    //state message for user
     abstract public function getStateMessage(): string;
 
-    /**
-     * Get badge color for UI
-     */
+   //state color
     abstract public function getBadgeColor(): string;
 
-    /**
-     * Check if payment is required
-     */
+    // Check payment is required
     abstract public function requiresPayment(): bool;
 
-    /**
-     * Get next logical state
-     */
+    //Get next logical state
     abstract public function getNextState(): ?string;
 
-    /**
-     * Handle transition to confirmed state
-     */
+    // transition confirmed
     public function confirm(): bool
     {
         return false;
     }
 
-    /**
-     * Handle transition to active state
-     */
+    // transition active
     public function activate(): bool
     {
         return false;
     }
 
-    /**
-     * Handle transition to completed state
-     */
+    //  transition completed
     public function complete(array $data = []): bool
     {
         return false;
     }
 
-    /**
-     * Handle transition to cancelled state
-     */
+    // transition cancelled
     public function cancel(string $reason = 'Cancelled by customer'): bool
     {
         return false;
     }
 
-    /**
-     * Check if transition to specific state is allowed
-     */
+    //Check transition to specific state is allowed
     public function canTransitionTo(string $state): bool
     {
         $allowedTransitions = $this->getAllowedTransitions();
         return in_array($state, $allowedTransitions);
     }
 
-    /**
-     * Get allowed transitions from current state
-     */
+   //transitions from current state
     abstract protected function getAllowedTransitions(): array;
 
-    /**
-     * Update booking status in database
-     */
+    //Update booking status in database
     protected function updateBookingStatus(string $status, array $additionalData = []): bool
     {
         $data = array_merge(['status' => $status], $additionalData);
         return $this->booking->update($data);
     }
 
-    /**
-     * Update vehicle status
-     */
+    //update vehicle state
     protected function updateVehicleStatus(string $status): void
     {
         if ($this->booking->vehicle) {

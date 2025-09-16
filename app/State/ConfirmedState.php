@@ -11,12 +11,12 @@ class ConfirmedState extends BookingState
     {
         $actions = ['view'];
 
-        // Can cancel if pickup date is more than 24 hours away
+        // cancel if pickup date is more than 24 hours away
         if ($this->booking->pickup_datetime->diffInHours(now()) > 24) {
             $actions[] = 'cancel';
         }
 
-        // Can activate if pickup date has arrived
+        // active when pickup date has arrived
         if ($this->booking->pickup_datetime <= now()) {
             $actions[] = 'activate';
         }
@@ -37,7 +37,7 @@ class ConfirmedState extends BookingState
 
     public function requiresPayment(): bool
     {
-        return false; // Payment already completed
+        return false; // Payment completed
     }
 
     public function getNextState(): ?string
@@ -56,13 +56,12 @@ class ConfirmedState extends BookingState
             return false;
         }
 
-        // Check if pickup time has arrived
         if ($this->booking->pickup_datetime > now()) {
-            return false;
+            return false;//reach pick up time
         }
 
         $this->updateBookingStatus('active');
-        // Vehicle remains 'rented' - no status change needed
+        // Vehicle remains 'rented'
 
         return true;
     }
@@ -73,7 +72,7 @@ class ConfirmedState extends BookingState
             return false;
         }
 
-        // Check if cancellation is still allowed (24 hours before pickup)
+        // Check if cancellation is still allowed (24 hours be4 pickup)
         if ($this->booking->pickup_datetime->diffInHours(now()) <= 24) {
             return false;
         }

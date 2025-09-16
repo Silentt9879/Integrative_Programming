@@ -4,30 +4,17 @@ namespace App\Factory;
 
 use App\Models\Vehicle;
 
-/**
- * Concrete Creator for Sedan vehicles
- */
+//create a Sedan vehicle
 class SedanCreator extends AbstractVehicleCreator
 {
-    /**
-     * Factory method to create a Sedan vehicle
-     *
-     * @param array $data Vehicle data
-     * @return Vehicle
-     */
     public function createVehicle(array $data): Vehicle
     {
-        // Ensure the type is set to Sedan
+        // Ensure type is Sedan
         $data['type'] = 'Sedan';
 
         return Vehicle::create($data);
     }
 
-    /**
-     * Get default values for Sedan vehicles
-     *
-     * @return array
-     */
     public function getDefaults(): array
     {
         return [
@@ -37,11 +24,6 @@ class SedanCreator extends AbstractVehicleCreator
         ];
     }
 
-    /**
-     * Get late fee for Sedan vehicles
-     *
-     * @return float
-     */
     public function getLateFee(): float
     {
         return 8.00;

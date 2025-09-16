@@ -4,30 +4,18 @@ namespace App\Factory;
 
 use App\Models\Vehicle;
 
-/**
- * Concrete Creator for Truck vehicles
- */
+//create a Truck vehicle
 class TruckCreator extends AbstractVehicleCreator
 {
-    /**
-     * Factory method to create a Truck vehicle
-     *
-     * @param array $data Vehicle data
-     * @return Vehicle
-     */
     public function createVehicle(array $data): Vehicle
     {
-        // Ensure the type is set to Truck
+        //  type set to Truck
         $data['type'] = 'Truck';
 
         return Vehicle::create($data);
     }
 
-    /**
-     * Get default values for Truck vehicles
-     *
-     * @return array
-     */
+    //default values
     public function getDefaults(): array
     {
         return [
@@ -37,11 +25,7 @@ class TruckCreator extends AbstractVehicleCreator
         ];
     }
 
-    /**
-     * Get late fee for Truck vehicles
-     *
-     * @return float
-     */
+    //  late fee Truck
     public function getLateFee(): float
     {
         return 20.00;

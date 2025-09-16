@@ -4,17 +4,10 @@ namespace App\Factory;
 
 use InvalidArgumentException;
 
-/**
- * Registry pattern to manage vehicle creators
- * This class coordinates which concrete creator to use
- */
+//create class
 class VehicleFactoryRegistry
 {
-    /**
-     * Map of vehicle types to their creator classes
-     *
-     * @var array
-     */
+
     private static array $creators = [
         'Sedan' => SedanCreator::class,
         'SUV' => SUVCreator::class,
@@ -24,13 +17,7 @@ class VehicleFactoryRegistry
         'Van' => VanCreator::class,
     ];
 
-    /**
-     * Get a creator instance for the specified vehicle type
-     *
-     * @param string $type Vehicle type
-     * @return AbstractVehicleCreator
-     * @throws InvalidArgumentException
-     */
+    //create vehicle type
     public static function getCreator(string $type): AbstractVehicleCreator
     {
         if (!isset(self::$creators[$type])) {
@@ -41,33 +28,20 @@ class VehicleFactoryRegistry
         return new $creatorClass();
     }
 
-    /**
-     * Get all supported vehicle types
-     *
-     * @return array
-     */
+    //supported vehicle types
     public static function getSupportedTypes(): array
     {
         return array_keys(self::$creators);
     }
 
-    /**
-     * Check if a vehicle type is supported
-     *
-     * @param string $type Vehicle type
-     * @return bool
-     */
+    // vehicle type is supported
     public static function isSupported(string $type): bool
     {
         return isset(self::$creators[$type]);
     }
 
-    /**
-     * Get type defaults for a specific vehicle type
-     *
-     * @param string $type Vehicle type
-     * @return array
-     */
+    // type defaults vehicle type
+
     public static function getTypeDefaults(string $type): array
     {
         $creator = self::getCreator($type);

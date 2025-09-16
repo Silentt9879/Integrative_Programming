@@ -50,7 +50,7 @@ class PendingState extends BookingState
             return false;
         }
 
-        // Can only confirm if payment is completed
+        // confirm when payment is completed
         if ($this->booking->payment_status !== 'paid') {
             return false;
         }
