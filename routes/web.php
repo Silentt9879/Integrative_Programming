@@ -188,6 +188,7 @@ Route::prefix('admin')->name('admin.')->middleware(\App\Http\Middleware\AdminMid
     Route::get('/bookings', [AdminController::class, 'bookings'])->name('bookings');
     Route::get('/bookings/{booking}', [AdminController::class, 'showBooking'])->name('bookings.show');
     Route::patch('/bookings/{booking}/status', [AdminController::class, 'updateBookingStatus'])->name('bookings.update-status');
+    Route::patch('/bookings/{booking}/return', [AdminController::class, 'returnVehicle'])->name('bookings.return');
 
     // Booking Export Route
     Route::get('/bookings/export', [BookingController::class, 'export'])->name('bookings.export');
@@ -209,7 +210,7 @@ Route::prefix('admin')->name('admin.')->middleware(\App\Http\Middleware\AdminMid
     // Vehicle CRUD Operations
     Route::get('/vehicles', [AdminController::class, 'vehicles'])->name('vehicles');
     Route::get('/vehicles/create', [AdminController::class, 'createVehicle'])->name('vehicles.create');
-    Route::post('/vehicles', [VehicleController::class, 'store'])->name('vehicles.store');
+    Route::post('/vehicles', [AdminController::class, 'storeVehicle'])->name('vehicles.store');
     Route::get('/vehicles/{vehicle}', [AdminController::class, 'showVehicle'])->name('vehicles.show');
     Route::get('/vehicles/{id}/edit', [VehicleController::class, 'edit'])->name('vehicles.edit');
     Route::put('/vehicles/{id}', [VehicleController::class, 'update'])->name('vehicles.update');

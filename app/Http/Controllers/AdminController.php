@@ -995,6 +995,58 @@ class AdminController extends Controller {
         ]);
     }
 
+    //Return vehicle - calculate late fees if applicable
+    public function returnVehicle(Request $request, Booking $booking) {
+        $this->ensureAdminAccess();
+
+        $validated = $request->validate([
+            'actual_return_datetime' => 'nullable|date',
+            'damage_charges' => 'nullable|numeric|min:0',
+            'notes' => 'nullable|string|max:500',
+            'return_condition' => 'nullable|string|max:500'
+        ]);
+
+        if (!$booking->canPerformAction('complete')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This booking cannot be returned in its current state.'
+            ], 400);
+        }
+
+        $actualReturn = $validated['actual_return_datetime'] ? 
+            Carbon::parse($validated['actual_return_datetime']) : now();
+
+        // Calculate late fees
+        $lateFees = 0;
+        if ($actualReturn > $booking->return_datetime && $booking->vehicle->rentalRate) {
+            $hoursLate = $booking->return_datetime->diffInHours($actualReturn);
+            $lateFees = $hoursLate * $booking->vehicle->rentalRate->late_fee_per_hour;
+        }
+
+        $completionData = [
+            'actual_return_datetime' => $actualReturn,
+            'late_fees' => $lateFees,
+            'damage_charges' => $validated['damage_charges'] ?? 0,
+            'notes' => $validated['notes'] ?? '',
+            'return_condition' => $validated['return_condition'] ?? ''
+        ];
+
+        if ($booking->complete($completionData)) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Vehicle returned successfully' . ($lateFees > 0 ? ' with late fees of RM' . number_format($lateFees, 2) : ''),
+                'newStatus' => $booking->status,
+                'lateFees' => $lateFees,
+                'finalAmount' => $booking->final_amount
+            ]);
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to return vehicle'
+        ], 400);
+    }
+
     /**
      * Payment Management - Chiew Chun Sheng will manage payments here
      */
