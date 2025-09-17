@@ -7,6 +7,7 @@ use App\Models\Vehicle;
 use App\State\StateFactory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Carbon\Carbon;
 
 class BookingController extends Controller {
@@ -93,6 +94,12 @@ class BookingController extends Controller {
 
         // Reserve the vehicle temporarily (set to 'rented' status to prevent double booking)
         $vehicle->update(['status' => 'rented']);
+        
+        // Clear vehicle cache when status changes
+        $this->clearVehicleCache();
+        
+        // Also clear individual vehicle cache
+        Cache::forget("vehicle_{$vehicle->id}");
 
         // Redirect to payment instead of confirmation
         return redirect()->route('payment.form', $booking->id)
@@ -146,6 +153,9 @@ class BookingController extends Controller {
         if (!$cancelled) {
             return back()->with('error', 'Unable to cancel booking. It may be too close to pickup time.');
         }
+
+        // Clear cache when booking is cancelled (vehicle becomes available again)
+        $this->clearVehicleCache();
 
         return redirect()->route('booking.index')
                         ->with('success', 'Booking cancelled successfully.');
@@ -228,6 +238,9 @@ class BookingController extends Controller {
             return back()->with('error', 'Unable to complete booking.');
         }
 
+        // Clear cache when booking is completed (vehicle becomes available again)
+        $this->clearVehicleCache();
+
         return redirect()->route('booking.show', $booking->id)
                         ->with('success', 'Booking completed successfully!');
     }
@@ -290,6 +303,35 @@ class BookingController extends Controller {
      */
     public function searchForm() {
         return view('booking.search-form');
+    }
+
+    /**
+     * Clear vehicle listing cache when availability changes
+     */
+    private function clearVehicleCache(): void
+    {
+        // Clear vehicle listing cache when availability changes
+        $commonFilters = ['', 'type=Economy', 'type=Luxury', 'type=Sedan', 'type=SUV', 'type=Van', 'type=Truck'];
+        
+        foreach ($commonFilters as $filter) {
+            $filterArray = [];
+            if (!empty($filter)) {
+                parse_str($filter, $filterArray);
+            }
+            $key = 'vehicles_' . md5(serialize($filterArray));
+            Cache::forget($key);
+        }
+        
+        // Clear the base cache key (no filters)
+        Cache::forget('vehicles_' . md5(''));
+        
+        // Also clear some common search combinations
+        $searchCombos = ['search=toyota', 'search=bmw', 'year=2020', 'year=2021', 'year=2022'];
+        foreach ($searchCombos as $combo) {
+            parse_str($combo, $comboArray);
+            $key = 'vehicles_' . md5(serialize($comboArray));
+            Cache::forget($key);
+        }
     }
 
     /**

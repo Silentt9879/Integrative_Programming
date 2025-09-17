@@ -25,8 +25,8 @@ class VehicleController extends Controller
         // Create cache key based on request parameters
         $cacheKey = 'vehicles_' . md5(serialize($request->all()));
 
-        $vehicles = Cache::remember($cacheKey, 1800, function () use ($request) { // 30 minutes cache
-            $query = Vehicle::with('rentalRate');
+        $vehicles = Cache::remember($cacheKey, 300, function () use ($request) { // Reduced to 5 minutes
+            $query = Vehicle::with('rentalRate'); // Show ALL vehicles, not just available ones
 
             // Enhanced filtering with better query optimization
             $this->applyFilters($query, $request);
@@ -38,7 +38,7 @@ class VehicleController extends Controller
         if ($request->filled('search')) {
             Log::info('Vehicle search performed', [
                 'search_term' => Str::limit($request->search, 50),
-                'filters' => $request->only(['type', 'year', 'max_rate']),
+                'filters' => $request->only(['type', 'year', 'max_rate', 'status']),
                 'results_count' => $vehicles->total()
             ]);
         }
@@ -49,36 +49,36 @@ class VehicleController extends Controller
     // ========================================================================
 // **SHOW INDIVIDUAL VEHICLE WITH CACHING**
 // ========================================================================
-public function show($id)
-{
-    try {
-        // Cache individual vehicle for 15 minutes
-        $cacheKey = "vehicle_{$id}";
+    public function show($id)
+    {
+        try {
+            // Cache individual vehicle for 15 minutes
+            $cacheKey = "vehicle_{$id}";
 
-        $vehicle = Cache::remember($cacheKey, 900, function () use ($id) {
-            return Vehicle::with('rentalRate')->findOrFail($id);
-        });
+            $vehicle = Cache::remember($cacheKey, 900, function () use ($id) {
+                return Vehicle::with('rentalRate')->findOrFail($id);
+            });
 
-        // Log vehicle view for analytics (optional)
-        Log::info('Vehicle viewed', [
-            'vehicle_id' => $vehicle->id,
-            'license_plate' => $vehicle->license_plate,
-            'viewer_id' => Auth::id(),
-            'ip' => request()->ip()
-        ]);
+            // Log vehicle view for analytics (optional)
+            Log::info('Vehicle viewed', [
+                'vehicle_id' => $vehicle->id,
+                'license_plate' => $vehicle->license_plate,
+                'viewer_id' => Auth::id(),
+                'ip' => request()->ip()
+            ]);
 
-        return view('vehicles.show', compact('vehicle'));
+            return view('vehicles.show', compact('vehicle'));
 
-    } catch (\Exception $e) {
-        Log::error('Error displaying vehicle', [
-            'vehicle_id' => $id,
-            'error' => $e->getMessage()
-        ]);
+        } catch (\Exception $e) {
+            Log::error('Error displaying vehicle', [
+                'vehicle_id' => $id,
+                'error' => $e->getMessage()
+            ]);
 
-        return redirect()->route('vehicles.index')
-                        ->with('error', 'Vehicle not found or unavailable.');
+            return redirect()->route('vehicles.index')
+                ->with('error', 'Vehicle not found or unavailable.');
+        }
     }
-}
 
     // ========================================================================
     // **ENHANCED STORE WITH SECURITY & ERROR HANDLING**
@@ -293,13 +293,13 @@ public function show($id)
         // Additional validation beyond form request
         $allowedMimes = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif'];
         return in_array($file->getMimeType(), $allowedMimes) &&
-               getimagesize($file->getPathname()) !== false;
+            getimagesize($file->getPathname()) !== false;
     }
 
     private function isValidImageUrl(string $url): bool
     {
         return filter_var($url, FILTER_VALIDATE_URL) &&
-               parse_url($url, PHP_URL_SCHEME) === 'https';
+            parse_url($url, PHP_URL_SCHEME) === 'https';
     }
 
     private function secureFileDelete(?string $imageUrl): void
@@ -316,6 +316,10 @@ public function show($id)
 
     private function applyFilters($query, Request $request): void
     {
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
         if ($request->filled('type')) {
             $query->where('type', $request->type);
         }
@@ -334,17 +338,47 @@ public function show($id)
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('make', 'like', "%{$search}%")
-                  ->orWhere('model', 'like', "%{$search}%")
-                  ->orWhere('license_plate', 'like', "%{$search}%");
+                    ->orWhere('model', 'like', "%{$search}%")
+                    ->orWhere('license_plate', 'like', "%{$search}%");
             });
         }
     }
 
+    /**
+     * Clear vehicle listing cache when availability changes
+     */
     private function clearVehicleCache(): void
     {
-        // Clear all vehicle-related cache
-        Cache::forget('vehicles_*');
-        // You might want to use cache tags if available in your cache driver
+        // Clear vehicle listing cache when availability changes
+        $commonFilters = [
+            '', 
+            'type=Economy', 'type=Luxury', 'type=Sedan', 'type=SUV', 'type=Van', 'type=Truck',
+            'status=available', 'status=rented', 'status=maintenance'
+        ];
+        
+        foreach ($commonFilters as $filter) {
+            $filterArray = [];
+            if (!empty($filter)) {
+                parse_str($filter, $filterArray);
+            }
+            $key = 'vehicles_' . md5(serialize($filterArray));
+            Cache::forget($key);
+        }
+        
+        // Clear the base cache key (no filters)
+        Cache::forget('vehicles_' . md5(''));
+        
+        // Also clear some common search combinations
+        $searchCombos = [
+            'search=toyota', 'search=bmw', 'search=perodua',
+            'year=2020', 'year=2021', 'year=2022', 'year=2025',
+            'status=available&type=Economy', 'status=rented&type=Luxury'
+        ];
+        foreach ($searchCombos as $combo) {
+            parse_str($combo, $comboArray);
+            $key = 'vehicles_' . md5(serialize($comboArray));
+            Cache::forget($key);
+        }
     }
 
     // ========================================================================
