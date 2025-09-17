@@ -1,5 +1,5 @@
 <?php
-// app/Models/Vehicle.php
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -12,7 +12,7 @@ class Vehicle extends Model
     protected $fillable = [
         'license_plate',
         'make',
-        'model', 
+        'model',
         'year',
         'color',
         'type',
@@ -30,7 +30,21 @@ class Vehicle extends Model
         'current_mileage' => 'decimal:2'
     ];
 
-    
+    protected $guarded = ['id', 'created_at', 'updated_at'];
+
+    public function setImageUrlAttribute($value)
+    {
+        if ($value && !filter_var($value, FILTER_VALIDATE_URL)) {
+            throw new \InvalidArgumentException('Invalid image URL format');
+        }
+
+        if ($value && parse_url($value, PHP_URL_SCHEME) !== 'https') {
+            throw new \InvalidArgumentException('Only HTTPS image URLs are allowed');
+        }
+
+        $this->attributes['image_url'] = $value;
+    }
+
     public function bookings()
     {
         return $this->hasMany(Booking::class);
@@ -41,7 +55,7 @@ class Vehicle extends Model
         return $this->hasOne(RentalRate::class);
     }
 
-  
+
     public function isAvailable()
     {
         return $this->status === 'available';
@@ -52,7 +66,7 @@ class Vehicle extends Model
         return $this->rentalRate ? $this->rentalRate->daily_rate : 0;
     }
 
-   
+
     public function scopeAvailable($query)
     {
         return $query->where('status', 'available');
@@ -61,6 +75,16 @@ class Vehicle extends Model
     public function scopeByType($query, $type)
     {
         return $query->where('type', $type);
+    }
+
+    public function scopeAvailableForPeriod($query, $pickupDate, $returnDate)
+    {
+        return $query->where('status', 'available')
+            ->whereDoesntHave('bookings', function ($q) use ($pickupDate, $returnDate) {
+                $q->whereNotIn('status', ['cancelled', 'completed'])
+                    ->where('pickup_datetime', '<=', $returnDate)
+                    ->where('return_datetime', '>=', $pickupDate);
+            });
     }
 
     public static function validationRules()
@@ -80,29 +104,18 @@ class Vehicle extends Model
             'image_url' => 'nullable|url'
         ];
     }
-    
-    
+
+
     public function isAvailableForPeriod($pickupDate, $returnDate)
-{
-    return !$this->bookings()
-        ->where('status', '!=', 'cancelled')
-        ->where(function($query) use ($pickupDate, $returnDate) {
-            // Check both pickup_datetime/return_datetime AND pickup_time/return_time
-            $query->where(function($q) use ($pickupDate, $returnDate) {
-                $q->whereBetween('pickup_datetime', [$pickupDate, $returnDate])
-                  ->orWhereBetween('return_datetime', [$pickupDate, $returnDate])
-                  ->orWhere(function($sub) use ($pickupDate, $returnDate) {
-                      $sub->where('pickup_datetime', '<=', $pickupDate)
-                          ->where('return_datetime', '>=', $returnDate);
-                  });
-            })->orWhere(function($q) use ($pickupDate, $returnDate) {
-                $q->whereBetween('pickup_time', [$pickupDate, $returnDate])
-                  ->orWhereBetween('return_time', [$pickupDate, $returnDate])
-                  ->orWhere(function($sub) use ($pickupDate, $returnDate) {
-                      $sub->where('pickup_time', '<=', $pickupDate)
-                          ->where('return_time', '>=', $returnDate);
-                  });
-            });
-        })->exists();
-}
+    {
+        return !$this->bookings()
+            ->whereNotIn('status', ['cancelled', 'completed'])
+            ->where(function ($query) use ($pickupDate, $returnDate) {
+                $query->where(function ($q) use ($pickupDate, $returnDate) {
+                    // Overlapping bookings check
+                    $q->where('pickup_datetime', '<=', $returnDate)
+                        ->where('return_datetime', '>=', $pickupDate);
+                });
+            })->exists();
+    }
 }

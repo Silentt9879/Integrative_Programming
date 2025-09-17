@@ -80,7 +80,7 @@ Route::prefix('admin')->name('admin.')->middleware(\App\Http\Middleware\AdminMid
     // Main Reports Page
     Route::get('/reports', [AdminController::class, 'reports'])->name('reports');
 
-    // AJAX Filter Reports  
+    // AJAX Filter Reports
     Route::post('/reports/filter', [AdminController::class, 'filterReports'])->name('reports.filter');
 
     // PDF Export Routes - Fixed to use dedicated ReportsController
@@ -110,14 +110,14 @@ Route::middleware('guest')->group(function () {
     })->name('password.request');
 
     Route::post('/forgot-password', [PasswordResetLinkController::class, 'store'])
-            ->name('password.email');
+        ->name('password.email');
 
     Route::get('/reset-password/{token}', function ($token) {
         return view('auth.reset-password', ['token' => $token, 'request' => request()]);
     })->name('password.reset');
 
     Route::post('/reset-password', [NewPasswordController::class, 'store'])
-            ->name('password.store');
+        ->name('password.store');
 
     // Admin Authentication (Separate Login System)
     Route::prefix('admin')->name('admin.')->group(function () {
@@ -192,11 +192,11 @@ Route::group(['prefix' => 'observer'], function () {
         Route::get('/dashboard', [ObserverAdminController::class, 'dashboard'])->name('dashboard');
         Route::get('/bookings', [ObserverAdminController::class, 'bookings'])->name('bookings');
         Route::post('/booking/{booking}/status', [ObserverAdminController::class, 'updateBookingStatus'])->name('booking.status');
-        
+
         // Enhanced Reports with Observer Pattern
         Route::get('/reports', [ObserverReportsController::class, 'index'])->name('reports');
         Route::get('/reports/export', [ObserverReportsController::class, 'exportPDF'])->name('reports.export');
-        
+
         // ========================================================================
         // **Observer Pattern Debug & Monitoring Routes**
         // ========================================================================
@@ -250,25 +250,62 @@ Route::prefix('admin')->name('admin.')->middleware(\App\Http\Middleware\AdminMid
 });
 
 // ============================================================================
-// **VEHICLE MANAGEMENT MODULE - Tan Xing Ye**
+// VEHICLE MANAGEMENT MODULE - Tan Xing Ye
 // ============================================================================
 
-// Public Vehicle Browsing (No Authentication Required - GUESTS CAN VIEW)
-Route::get('/vehicles', [VehicleController::class, 'index'])->name('vehicles.index');
-Route::get('/vehicles/{id}', [VehicleController::class, 'show'])->name('vehicles.show');
+// Public Vehicle Browsing (GUESTS CAN VIEW)
+Route::get('/vehicles', [VehicleController::class, 'index'])
+    ->middleware('cache.headers:public;max_age=1800')
+    ->name('vehicles.index');
+
+Route::get('/vehicles/{id}', [VehicleController::class, 'show'])
+    ->middleware('cache.headers:public;max_age=900')
+    ->name('vehicles.show');
 
 // Admin Vehicle Management
 Route::prefix('admin')->name('admin.')->middleware(\App\Http\Middleware\AdminMiddleware::class)->group(function () {
-    // ========================================================================
-    // **Vehicle Management Module**
-    // ========================================================================
     // Vehicle CRUD Operations
     Route::get('/vehicles', [AdminController::class, 'vehicles'])->name('vehicles');
     Route::get('/vehicles/create', [AdminController::class, 'createVehicle'])->name('vehicles.create');
-    Route::post('/vehicles', [AdminController::class, 'storeVehicle'])->name('vehicles.store');
+
+    // Rate limited operations
+    Route::post('/vehicles', [AdminController::class, 'storeVehicle'])
+        ->middleware('throttle:vehicle-creation')
+        ->name('vehicles.store');
+
     Route::get('/vehicles/{vehicle}', [AdminController::class, 'showVehicle'])->name('vehicles.show');
     Route::get('/vehicles/{id}/edit', [VehicleController::class, 'edit'])->name('vehicles.edit');
-    Route::put('/vehicles/{id}', [VehicleController::class, 'update'])->name('vehicles.update');
-    Route::delete('/vehicles/{id}', [VehicleController::class, 'destroy'])->name('vehicles.destroy');
-    Route::patch('/vehicles/{vehicle}/toggle-status', [AdminController::class, 'toggleStatus'])->name('vehicles.toggle-status');
+
+    Route::put('/vehicles/{id}', [VehicleController::class, 'update'])
+        ->middleware('throttle:vehicle-updates')
+        ->name('vehicles.update');
+
+    Route::delete('/vehicles/{id}', [VehicleController::class, 'destroy'])
+        ->middleware('throttle:vehicle-deletion')
+        ->name('vehicles.destroy');
+
+    Route::patch('/vehicles/{vehicle}/toggle-status', [AdminController::class, 'toggleStatus'])
+        ->name('vehicles.toggle-status');
+});
+
+// ============================================================================
+// API ROUTES FOR VEHICLE MODULE
+// ============================================================================
+Route::prefix('api/v1')->middleware(['throttle:api'])->group(function () {
+    // Public API endpoints
+    Route::get('/vehicles/types/{type}/defaults', [VehicleController::class, 'getTypeDefaults'])
+        ->name('api.vehicles.type-defaults');
+
+    // Admin API endpoints
+    Route::middleware(\App\Http\Middleware\AdminMiddleware::class)->group(function () {
+        Route::get('/vehicles/statistics', [VehicleController::class, 'getStatistics'])
+            ->name('api.vehicles.statistics');
+    });
+});
+
+// Cache management
+Route::prefix('admin/cache')->name('admin.cache.')
+    ->middleware(\App\Http\Middleware\AdminMiddleware::class)->group(function () {
+    Route::post('/vehicles/clear', [VehicleController::class, 'clearCache'])
+        ->name('vehicles.clear');
 });
