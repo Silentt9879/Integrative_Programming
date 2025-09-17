@@ -4,7 +4,6 @@ namespace App\Factory;
 
 use InvalidArgumentException;
 
-//create class
 class VehicleFactoryRegistry
 {
 
@@ -16,8 +15,8 @@ class VehicleFactoryRegistry
         'Truck' => TruckCreator::class,
         'Van' => VanCreator::class,
     ];
+    //creator instance based on vehicle type.
 
-    //create vehicle type
     public static function getCreator(string $type): AbstractVehicleCreator
     {
         if (!isset(self::$creators[$type])) {
@@ -28,20 +27,19 @@ class VehicleFactoryRegistry
         return new $creatorClass();
     }
 
-    //supported vehicle types
+   //Returns array of all vehicle types that can be created by this factory.
     public static function getSupportedTypes(): array
     {
         return array_keys(self::$creators);
     }
 
-    // vehicle type is supported
+    //Validates whether a given vehicle type
     public static function isSupported(string $type): bool
     {
         return isset(self::$creators[$type]);
     }
 
-    // type defaults vehicle type
-
+    //Get default values and configuration for specific vehicle type
     public static function getTypeDefaults(string $type): array
     {
         $creator = self::getCreator($type);
