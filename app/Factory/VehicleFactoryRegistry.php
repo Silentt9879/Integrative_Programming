@@ -3,6 +3,13 @@
 namespace App\Factory;
 
 use InvalidArgumentException;
+// Add these missing imports:
+use App\Factory\SedanCreator;
+use App\Factory\SUVCreator;
+use App\Factory\LuxuryCreator;
+use App\Factory\EconomyCreator;
+use App\Factory\TruckCreator;
+use App\Factory\VanCreator;
 
 class VehicleFactoryRegistry
 {
