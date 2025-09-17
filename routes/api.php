@@ -3,6 +3,8 @@
 // BMIT3173 Assignment - Vehicle Module API - Tan Xing Ye
 
 use App\Http\Controllers\Api\VehicleApiController;
+use App\Http\Controllers\Api\PaymentApiController;
+use App\Http\Controllers\Api\ReportsApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -79,6 +81,32 @@ Route::prefix('v1')->group(function () {
         // Toggle vehicle status
         Route::patch('/vehicles/{id}/toggle-status', [VehicleApiController::class, 'toggleStatus'])
              ->name('api.vehicles.toggle-status');
+    });
+});
+
+// ============================================================================
+// **PAYMENTS ROUTE FOR API**
+// ============================================================================
+Route::middleware('auth:sanctum')->group(function () {
+    Route::prefix('payments')->group(function () {
+        Route::get('methods', [PaymentApiController::class, 'getPaymentMethods']);
+        Route::post('bookings/{bookingId}/initialize', [PaymentApiController::class, 'initializePayment']);
+        Route::post('bookings/{bookingId}/process', [PaymentApiController::class, 'processPayment']);
+        Route::get('bookings/{bookingId}/status', [PaymentApiController::class, 'getPaymentStatus']);
+        Route::get('history', [PaymentApiController::class, 'getPaymentHistory']);
+        Route::post('validate', [PaymentApiController::class, 'validatePaymentData']);
+    });
+
+// ============================================================================
+// **REPORTS ROUTE FOR API**
+// ============================================================================
+    Route::prefix('reports')->group(function () {
+        Route::get('formats', [ReportsApiController::class, 'getAvailableFormats']);
+        Route::post('booking', [ReportsApiController::class, 'generateBookingReport']);
+        Route::get('summary', [ReportsApiController::class, 'getBookingSummary']);
+        Route::get('history', [ReportsApiController::class, 'getReportHistory']);
+        Route::post('validate', [ReportsApiController::class, 'validateReportRequest']);
+        Route::get('{reportId}/status', [ReportsApiController::class, 'getReportStatus']);
     });
 });
 
