@@ -44,6 +44,10 @@ Route::middleware(\App\Http\Middleware\UserOnly::class)->group(function () {
         Route::post('/{booking}/complete', [PaymentController::class, 'completePayment'])->name('complete');
         Route::get('/{booking}/success', [PaymentController::class, 'paymentSuccess'])->name('success');
         Route::get('/{booking}/failed', [PaymentController::class, 'paymentFailed'])->name('failed');
+        Route::get('/{booking}/additional-charges', [PaymentController::class, 'showAdditionalCharges'])->name('additional-charges');
+        Route::post('/{booking}/additional-charges/process', [PaymentController::class, 'processAdditionalCharges'])->name('additional-charges.process');
+        Route::post('/{booking}/additional-charges/complete', [PaymentController::class, 'completeAdditionalCharges'])->name('additional-charges.complete');
+        Route::get('/{booking}/additional-success', [PaymentController::class, 'additionalChargesSuccess'])->name('additional-success');
     });
 
     // ========================================================================

@@ -52,6 +52,25 @@ class Booking extends Model
     ];
 
     /**
+     * Check if booking has pending additional charges
+     */
+    public function hasPendingAdditionalCharges(): bool
+    {
+        return $this->payment_status === 'additional_charges_pending';
+    }
+
+    /**
+     * Get pending additional charges amount
+     */
+    public function getPendingAdditionalCharges()
+    {
+        return \App\Models\Payment::where('booking_id', $this->id)
+                ->where('payment_type', 'additional_charges')
+                ->where('status', 'pending')
+                ->first();
+    }
+
+    /**
      * Cache for state object
      */
     private ?BookingState $stateObject = null;

@@ -132,7 +132,7 @@ class PaymentController extends Controller {
                         ->with('info', 'Please complete your payment to confirm the booking.');
     }
 
-    /**
+   /**
      * Check payment status (AJAX endpoint)
      */
     public function checkPaymentStatus($bookingId) {
@@ -148,5 +148,125 @@ class PaymentController extends Controller {
                     'total_amount' => $booking->total_amount,
                     'is_paid' => $booking->payment_status === 'paid'
         ]);
+    }
+
+    /**
+     * Show additional charges payment form
+     */
+    public function showAdditionalCharges($bookingId) {
+        $booking = Booking::with(['vehicle', 'vehicle.rentalRate'])
+                ->where('id', $bookingId)
+                ->where('user_id', Auth::id())
+                ->where('payment_status', 'additional_charges_pending')
+                ->firstOrFail();
+
+        // Get the pending additional charges payment
+        $additionalPayment = \App\Models\Payment::where('booking_id', $booking->id)
+                ->where('payment_type', 'additional_charges')
+                ->where('status', 'pending')
+                ->first();
+
+        if (!$additionalPayment) {
+            return redirect()->route('booking.show', $booking->id)
+                            ->with('error', 'No additional charges found for this booking.');
+        }
+
+        return view('payment.additional-charges', compact('booking', 'additionalPayment'));
+    }
+
+    /**
+     * Process additional charges payment
+     */
+    public function processAdditionalCharges(Request $request, $bookingId) {
+        $validated = $request->validate([
+            'payment_method' => 'required|in:credit_card,debit_card,online_banking',
+            'card_number' => 'nullable|required_if:payment_method,credit_card,debit_card|string|min:16|max:19',
+            'card_holder' => 'nullable|required_if:payment_method,credit_card,debit_card|string|max:255',
+            'expiry_month' => 'nullable|required_if:payment_method,credit_card,debit_card|integer|between:1,12',
+            'expiry_year' => 'nullable|required_if:payment_method,credit_card,debit_card|integer|min:2025',
+            'cvv' => 'nullable|required_if:payment_method,credit_card,debit_card|string|min:3|max:4',
+            'bank_name' => 'nullable|required_if:payment_method,online_banking|string',
+        ]);
+
+        $booking = Booking::with(['vehicle'])
+                ->where('id', $bookingId)
+                ->where('user_id', Auth::id())
+                ->where('payment_status', 'additional_charges_pending')
+                ->firstOrFail();
+
+        $additionalPayment = \App\Models\Payment::where('booking_id', $booking->id)
+                ->where('payment_type', 'additional_charges')
+                ->where('status', 'pending')
+                ->firstOrFail();
+
+        return view('payment.processing-additional', [
+            'booking' => $booking,
+            'additionalPayment' => $additionalPayment,
+            'payment_data' => $validated
+        ]);
+    }
+
+    /**
+     * Complete additional charges payment
+     */
+    public function completeAdditionalCharges(Request $request, $bookingId) {
+        $booking = Booking::with(['vehicle'])
+                ->where('id', $bookingId)
+                ->where('user_id', Auth::id())
+                ->where('payment_status', 'additional_charges_pending')
+                ->firstOrFail();
+
+        $additionalPayment = \App\Models\Payment::where('booking_id', $booking->id)
+                ->where('payment_type', 'additional_charges')
+                ->where('status', 'pending')
+                ->firstOrFail();
+
+        // Simulate payment processing (95% success rate)
+        $success = rand(1, 100) <= 95;
+
+        if ($success) {
+            // Update payment status
+            $additionalPayment->update([
+                'status' => 'completed',
+                'payment_date' => now(),
+                'payment_method' => $request->input('payment_method', 'credit_card')
+            ]);
+
+            // Update booking payment status
+            $booking->update([
+                'payment_status' => 'paid_with_additional'
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Additional charges payment processed successfully!',
+                'transaction_id' => 'TXN' . time() . rand(1000, 9999),
+                'redirect_url' => route('payment.additional-success', $booking->id)
+            ]);
+        } else {
+            return response()->json([
+                'success' => false,
+                'message' => 'Payment failed. Please try again.',
+                'error_code' => 'PAYMENT_DECLINED'
+            ], 400);
+        }
+    }
+
+    /**
+     * Show additional charges payment success
+     */
+    public function additionalChargesSuccess($bookingId) {
+        $booking = Booking::with(['vehicle', 'vehicle.rentalRate'])
+                ->where('id', $bookingId)
+                ->where('user_id', Auth::id())
+                ->where('payment_status', 'paid_with_additional')
+                ->firstOrFail();
+
+        $additionalPayment = \App\Models\Payment::where('booking_id', $booking->id)
+                ->where('payment_type', 'additional_charges')
+                ->where('status', 'completed')
+                ->first();
+
+        return view('payment.additional-success', compact('booking', 'additionalPayment'));
     }
 }

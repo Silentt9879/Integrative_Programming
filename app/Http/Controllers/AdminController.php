@@ -1032,19 +1032,65 @@ class AdminController extends Controller {
         ];
 
         if ($booking->complete($completionData)) {
-            return response()->json([
-                'success' => true,
-                'message' => 'Vehicle returned successfully' . ($lateFees > 0 ? ' with late fees of RM' . number_format($lateFees, 2) : ''),
-                'newStatus' => $booking->status,
-                'lateFees' => $lateFees,
-                'finalAmount' => $booking->final_amount
-            ]);
+            // Check if there are additional charges (late fees or damage)
+            $additionalCharges = $lateFees + ($validated['damage_charges'] ?? 0);
+            
+            if ($additionalCharges > 0) {
+                // Create a payment record for additional charges
+                $this->createAdditionalChargesPayment($booking, $additionalCharges, $lateFees, $validated['damage_charges'] ?? 0);
+                
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Vehicle returned successfully. Additional charges of RM' . number_format($additionalCharges, 2) . ' have been applied.',
+                    'newStatus' => $booking->status,
+                    'lateFees' => $lateFees,
+                    'damageCharges' => $validated['damage_charges'] ?? 0,
+                    'additionalCharges' => $additionalCharges,
+                    'finalAmount' => $booking->final_amount,
+                    'requiresPayment' => true
+                ]);
+            } else {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Vehicle returned successfully with no additional charges.',
+                    'newStatus' => $booking->status,
+                    'finalAmount' => $booking->final_amount,
+                    'requiresPayment' => false
+                ]);
+            }
         }
 
         return response()->json([
             'success' => false,
             'message' => 'Failed to return vehicle'
         ], 400);
+    }
+
+    /**
+     * Create additional charges payment for late fees and damages
+     */
+    private function createAdditionalChargesPayment(Booking $booking, $totalCharges, $lateFees, $damageCharges) {
+        // Create a payment record for the additional charges
+        $payment = \App\Models\Payment::create([
+            'booking_id' => $booking->id,
+            'amount' => $totalCharges,
+            'payment_method' => 'pending',
+            'payment_type' => 'additional_charges',
+            'status' => 'pending',
+            'payment_details' => [
+                'late_fees' => $lateFees,
+                'damage_charges' => $damageCharges,
+                'description' => 'Additional charges for late return and/or vehicle damage'
+            ],
+            'notes' => 'Payment required for additional charges incurred during rental period'
+        ]);
+
+        // Update booking to reflect pending additional payment
+        $booking->update([
+            'payment_status' => 'additional_charges_pending'
+        ]);
+
+        return $payment;
     }
 
     /**
