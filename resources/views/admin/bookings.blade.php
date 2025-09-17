@@ -105,8 +105,12 @@
         background: #17a2b8;
         color: white;
     }
-    .btn-view:hover {
-        background: #138496;
+    .btn-return {
+        background: #28a745;
+        color: white;
+    }
+    .btn-return:hover {
+        background: #218838;
         transform: translateY(-1px);
     }
 
@@ -403,6 +407,11 @@
                                     <button class="action-btn btn-view" onclick="viewBooking({{ $booking->id ?? rand(1,999) }})" title="View Details">
                                         <i class="fas fa-eye"></i>
                                     </button>
+                                    @if(in_array(($booking->status ?? 'confirmed'), ['confirmed', 'active']))
+                                    <button class="action-btn btn-return" onclick="returnVehicle({{ $booking->id ?? rand(1,999) }})" title="Return Vehicle">
+                                        <i class="fas fa-undo"></i>
+                                    </button>
+                                    @endif
                                 </div>
                             </td>
                         </tr>
@@ -590,6 +599,94 @@
     document.getElementById('date_range').addEventListener('change', function() {
     document.getElementById('filterForm').submit();
     });
+    document.getElementById('sort').addEventListener('change', function() {
+    document.getElementById('filterForm').submit();
+    });
+
+    function returnVehicle(id) {
+        const modal = `
+            <div class="modal fade" id="returnModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Return Vehicle</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <form id="returnForm">
+                            <div class="modal-body">
+                                <div class="mb-3">
+                                    <label class="form-label">Actual Return Date & Time</label>
+                                    <input type="datetime-local" class="form-control" name="actual_return_datetime" value="${new Date().toISOString().slice(0,16)}">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Damage Charges (RM)</label>
+                                    <input type="number" step="0.01" class="form-control" name="damage_charges" placeholder="0.00">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Vehicle Condition</label>
+                                    <textarea class="form-control" name="return_condition" rows="2" placeholder="Describe vehicle condition upon return"></textarea>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Additional Notes</label>
+                                    <textarea class="form-control" name="notes" rows="2"></textarea>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-success">Process Return</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.insertAdjacentHTML('beforeend', modal);
+        const returnModal = new bootstrap.Modal(document.getElementById('returnModal'));
+        returnModal.show();
+        
+        document.getElementById('returnForm').onsubmit = function(e) {
+            e.preventDefault();
+            showLoading();
+            
+            const formData = new FormData(this);
+            const data = Object.fromEntries(formData);
+            
+            fetch(`/admin/bookings/${id}/return`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideLoading();
+                returnModal.hide();
+                document.getElementById('returnModal').remove();
+                
+                if (data.success) {
+                    showAlert(data.message, 'success');
+                    // Update status badge
+                    const statusBadge = document.getElementById(`booking-status-${id}`);
+                    if (statusBadge) {
+                        statusBadge.className = 'status-badge status-completed';
+                        statusBadge.textContent = 'Completed';
+                    }
+                    // Refresh table or update row
+                    location.reload();
+                } else {
+                    showAlert(data.message, 'error');
+                }
+            })
+            .catch(error => {
+                hideLoading();
+                showAlert('Error processing return: ' + error.message, 'error');
+            });
+        };
+    }
+
     document.getElementById('sort').addEventListener('change', function() {
     document.getElementById('filterForm').submit();
     });
