@@ -91,6 +91,11 @@ Route::prefix('admin')->name('admin.')->middleware(\App\Http\Middleware\AdminMid
 // **CUSTOMER & USER MANAGEMENT MODULE & ADMIN REPORTING - Jayvian Lazarus Jerome**
 // ============================================================================
 
+// Observer Pattern Enhanced Controllers - Jayvian
+use App\Http\Controllers\Observer\Enhanced\AuthController as ObserverAuthController;
+use App\Http\Controllers\Observer\Enhanced\AdminController as ObserverAdminController;
+use App\Http\Controllers\Observer\Enhanced\ReportsController as ObserverReportsController;
+
 // Guest Authentication Routes (Login, Register, Password Reset)
 Route::middleware('guest')->group(function () {
     // Regular User Authentication
@@ -153,6 +158,52 @@ Route::prefix('admin')->name('admin.')->middleware(\App\Http\Middleware\AdminMid
     Route::post('/customers', [AdminController::class, 'storeCustomer'])->name('customers.store');
     Route::put('/customers/{user}', [AdminController::class, 'updateCustomer'])->name('customers.update');
     Route::delete('/customers/{user}', [AdminController::class, 'deleteCustomer'])->name('customers.delete');
+});
+
+// ========================================================================
+// **OBSERVER PATTERN IMPLEMENTATION - Jayvian Lazarus Jerome**
+// ========================================================================
+// Enhanced controllers with Observer Pattern for event-driven notifications
+// Handles user registration, booking changes, and report generation events
+
+Route::group(['prefix' => 'observer'], function () {
+    // ========================================================================
+    // **Observer Pattern - Enhanced Authentication Routes**
+    // ========================================================================
+    // Enhanced Auth routes with Observer Pattern (triggers notifications)
+    Route::middleware('guest')->group(function () {
+        Route::get('/register', [ObserverAuthController::class, 'showRegister'])->name('observer.register');
+        Route::post('/register', [ObserverAuthController::class, 'register'])->name('observer.register.post');
+        Route::get('/login', [ObserverAuthController::class, 'showLogin'])->name('observer.login');
+        Route::post('/login', [ObserverAuthController::class, 'login'])->name('observer.login.post');
+    });
+
+    // Enhanced User Routes with Observer Pattern
+    Route::middleware(\App\Http\Middleware\UserOnly::class)->group(function () {
+        Route::post('/logout', [ObserverAuthController::class, 'logout'])->name('observer.logout');
+    });
+
+    // ========================================================================
+    // **Observer Pattern - Enhanced Admin Routes**
+    // ========================================================================
+    // Enhanced Admin routes with Observer Pattern (triggers booking/report notifications)
+    Route::prefix('admin')->name('observer.admin.')->middleware(\App\Http\Middleware\AdminMiddleware::class)->group(function () {
+        // Enhanced Admin Dashboard & Management
+        Route::get('/dashboard', [ObserverAdminController::class, 'dashboard'])->name('dashboard');
+        Route::get('/bookings', [ObserverAdminController::class, 'bookings'])->name('bookings');
+        Route::post('/booking/{booking}/status', [ObserverAdminController::class, 'updateBookingStatus'])->name('booking.status');
+        
+        // Enhanced Reports with Observer Pattern
+        Route::get('/reports', [ObserverReportsController::class, 'index'])->name('reports');
+        Route::get('/reports/export', [ObserverReportsController::class, 'exportPDF'])->name('reports.export');
+        
+        // ========================================================================
+        // **Observer Pattern Debug & Monitoring Routes**
+        // ========================================================================
+        // Debug routes for Observer Pattern (development/testing)
+        Route::get('/observer/booking-info', [ObserverAdminController::class, 'getObserverInfo'])->name('observer.booking.debug');
+        Route::get('/observer/report-info', [ObserverReportsController::class, 'getObserverInfo'])->name('observer.report.debug');
+    });
 });
 
 // ============================================================================
