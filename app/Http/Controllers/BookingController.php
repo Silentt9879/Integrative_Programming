@@ -91,6 +91,9 @@ class BookingController extends Controller {
             'special_requests' => $validated['special_requests']
         ]);
 
+        // Reserve the vehicle temporarily (set to 'rented' status to prevent double booking)
+        $vehicle->update(['status' => 'rented']);
+
         // Redirect to payment instead of confirmation
         return redirect()->route('payment.form', $booking->id)
                         ->with('success', 'Booking created! Please complete payment to confirm your reservation.');

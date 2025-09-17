@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 use App\Factory\VehicleFactoryRegistry;
+use Illuminate\Support\Facades\Auth;
 
 /**
  * StoreVehicleRequest - Form Request for vehicle creation validation
@@ -19,7 +20,7 @@ class StoreVehicleRequest extends FormRequest
     public function authorize(): bool
     {
         // Only authenticated admin users can create vehicles
-        return auth()->check() && auth()->user()->is_admin;
+        return Auth::check() && Auth::user()->is_admin;
     }
 
     /**

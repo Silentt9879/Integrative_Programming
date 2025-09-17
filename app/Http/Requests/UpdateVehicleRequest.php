@@ -5,6 +5,7 @@ namespace App\Http\Requests;
 use Illuminate\Foundation\Http\FormRequest;
 use App\Factory\VehicleFactoryRegistry;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Auth;
 
 /**
  * UpdateVehicleRequest - Form Request for vehicle update validation
@@ -20,7 +21,7 @@ class UpdateVehicleRequest extends FormRequest
     public function authorize(): bool
     {
         // Only authenticated admin users can update vehicles
-        return auth()->check() && auth()->user()->is_admin;
+        return Auth::check() && Auth::user()->is_admin;
     }
 
     /**

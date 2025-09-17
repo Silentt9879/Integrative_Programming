@@ -11,6 +11,7 @@ use App\Http\Requests\UpdateVehicleRequest;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\DB;
 
 /**
  * VehicleApiController - RESTful API Controller for Vehicle Management
@@ -81,7 +82,6 @@ class VehicleApiController extends Controller
                     'filters_applied' => $this->getAppliedFilters($request)
                 ]
             ], Response::HTTP_OK);
-
         } catch (\Exception $e) {
             return response()->json([
                 'status' => 'error',
@@ -117,7 +117,6 @@ class VehicleApiController extends Controller
                 'data' => VehicleResource::collection($vehicles),
                 'count' => $vehicles->count()
             ], Response::HTTP_OK);
-
         } catch (\Exception $e) {
             return response()->json([
                 'status' => 'error',
@@ -153,14 +152,12 @@ class VehicleApiController extends Controller
                 'message' => 'Vehicle created successfully using Factory Method Pattern',
                 'data' => new VehicleResource($vehicle)
             ], Response::HTTP_CREATED);
-
         } catch (\InvalidArgumentException $e) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Invalid vehicle type',
                 'error' => $e->getMessage()
             ], Response::HTTP_BAD_REQUEST);
-
         } catch (\Exception $e) {
             return response()->json([
                 'status' => 'error',
@@ -197,7 +194,6 @@ class VehicleApiController extends Controller
                 'data' => new VehicleResource($vehicle),
                 'similar_vehicles' => VehicleResource::collection($similarVehicles)
             ], Response::HTTP_OK);
-
         } catch (\Exception $e) {
             return response()->json([
                 'status' => 'error',
@@ -235,14 +231,12 @@ class VehicleApiController extends Controller
                 'message' => 'Vehicle updated successfully using Factory Method Pattern',
                 'data' => new VehicleResource($vehicle)
             ], Response::HTTP_OK);
-
         } catch (\InvalidArgumentException $e) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Invalid vehicle type',
                 'error' => $e->getMessage()
             ], Response::HTTP_BAD_REQUEST);
-
         } catch (\Exception $e) {
             return response()->json([
                 'status' => 'error',
@@ -277,7 +271,6 @@ class VehicleApiController extends Controller
                 'status' => 'success',
                 'message' => 'Vehicle deleted successfully'
             ], Response::HTTP_OK);
-
         } catch (\Exception $e) {
             $statusCode = str_contains($e->getMessage(), 'active bookings')
                 ? Response::HTTP_CONFLICT
@@ -316,7 +309,6 @@ class VehicleApiController extends Controller
                 'message' => "Vehicle status updated to {$vehicle->status}",
                 'data' => new VehicleResource($vehicle)
             ], Response::HTTP_OK);
-
         } catch (\Exception $e) {
             return response()->json([
                 'status' => 'error',
@@ -351,7 +343,6 @@ class VehicleApiController extends Controller
                 'message' => "Default values for {$type} type retrieved successfully",
                 'data' => $defaults
             ], Response::HTTP_OK);
-
         } catch (\Exception $e) {
             return response()->json([
                 'status' => 'error',
@@ -425,7 +416,6 @@ class VehicleApiController extends Controller
                     'available' => $isAvailable
                 ]
             ], Response::HTTP_OK);
-
         } catch (\Exception $e) {
             return response()->json([
                 'status' => 'error',
@@ -455,10 +445,10 @@ class VehicleApiController extends Controller
                 'available_vehicles' => \App\Models\Vehicle::where('status', 'available')->count(),
                 'rented_vehicles' => \App\Models\Vehicle::where('status', 'rented')->count(),
                 'maintenance_vehicles' => \App\Models\Vehicle::where('status', 'maintenance')->count(),
-                'vehicle_types' => \App\Models\Vehicle::select('type', \DB::raw('count(*) as count'))
+                'vehicle_types' => \App\Models\Vehicle::select('type', DB::raw('count(*) as count'))
                     ->groupBy('type')
                     ->get(),
-                'fuel_types' => \App\Models\Vehicle::select('fuel_type', \DB::raw('count(*) as count'))
+                'fuel_types' => \App\Models\Vehicle::select('fuel_type', DB::raw('count(*) as count'))
                     ->groupBy('fuel_type')
                     ->get(),
                 'average_daily_rate' => \App\Models\RentalRate::avg('daily_rate'),
@@ -470,7 +460,6 @@ class VehicleApiController extends Controller
                 'message' => 'Vehicle statistics retrieved successfully',
                 'data' => $stats
             ], Response::HTTP_OK);
-
         } catch (\Exception $e) {
             return response()->json([
                 'status' => 'error',

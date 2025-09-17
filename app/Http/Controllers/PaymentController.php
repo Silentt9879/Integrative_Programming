@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Booking;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class PaymentController extends Controller {
 
@@ -20,7 +21,7 @@ class PaymentController extends Controller {
 
         return view('payment.form', compact('booking'));
     }
-    
+
     public function processPayment(Request $request, $bookingId) {
         $validated = $request->validate([
             'payment_method' => 'required|in:credit_card,debit_card,online_banking',
@@ -55,17 +56,27 @@ class PaymentController extends Controller {
         $success = rand(1, 100) <= 95;
 
         if ($success) {
-            // Update booking status
-            $booking->update([
-                'status' => 'confirmed',
-                'payment_status' => 'paid',
-                'final_amount' => $request->input('amount', $booking->total_amount)
-            ]);
+    // Update payment status first
+    $booking->update([
+        'payment_status' => 'paid',
+        'final_amount' => $request->input('amount', $booking->total_amount)
+    ]);
 
-            // Update vehicle status to rented since payment is successful
-            $booking->vehicle->update(['status' => 'rented']);
+    // Use state pattern to confirm booking (this will update vehicle status to 'rented')
+    $confirmed = $booking->confirm();
 
-            \Log::info('Payment completed successfully', [
+    if (!$confirmed) {
+        \Illuminate\Support\Facades\Log::error("Failed to confirm booking {$booking->id} after payment");
+        // Rollback payment status if confirmation failed
+        $booking->update(['payment_status' => 'pending']);
+        return response()->json([
+            'success' => false,
+            'message' => 'Payment successful but booking confirmation failed. Please contact support.',
+            'error_code' => 'CONFIRMATION_FAILED'
+        ], 400);
+    }
+
+            \Illuminate\Support\Facades\Log::info('Payment completed successfully', [
                 'booking_id' => $booking->id,
                 'booking_number' => $booking->booking_number,
                 'vehicle_id' => $booking->vehicle->id,
@@ -79,7 +90,7 @@ class PaymentController extends Controller {
                         'redirect_url' => route('payment.success', $booking->id)
             ]);
         } else {
-            \Log::warning('Payment failed', [
+            \Illuminate\Support\Facades\Log::warning('Payment failed', [
                 'booking_id' => $booking->id,
                 'booking_number' => $booking->booking_number,
                 'reason' => 'Random failure for demo purposes'

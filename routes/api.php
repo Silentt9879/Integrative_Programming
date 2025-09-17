@@ -20,13 +20,13 @@ use Illuminate\Support\Facades\Route;
 */
 
 // ============================================================================
-// **VEHICLE MODULE API ROUTES - Tan Xing Ye**
+// *VEHICLE MODULE API ROUTES - Tan Xing Ye*
 // ============================================================================
 
 Route::prefix('v1')->group(function () {
 
     // ========================================================================
-    // **PUBLIC VEHICLE API ENDPOINTS**
+    // *PUBLIC VEHICLE API ENDPOINTS*
     // ========================================================================
     // These endpoints are accessible without authentication
 
@@ -59,7 +59,7 @@ Route::prefix('v1')->group(function () {
          ->name('api.vehicles.statistics');
 
     // ========================================================================
-    // **ADMIN-ONLY API ENDPOINTS**
+    // *ADMIN-ONLY API ENDPOINTS*
     // ========================================================================
     // These endpoints require admin authentication
 
@@ -85,7 +85,7 @@ Route::prefix('v1')->group(function () {
 });
 
 // ============================================================================
-// **PAYMENTS ROUTE FOR API**
+// *PAYMENTS ROUTE FOR API*
 // ============================================================================
 Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('payments')->group(function () {
@@ -98,7 +98,7 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
 // ============================================================================
-// **REPORTS ROUTE FOR API**
+// *REPORTS ROUTE FOR API*
 // ============================================================================
     Route::prefix('reports')->group(function () {
         Route::get('formats', [ReportsApiController::class, 'getAvailableFormats']);
@@ -111,7 +111,7 @@ Route::middleware('auth:sanctum')->group(function () {
 });
 
 // ============================================================================
-// **FALLBACK ROUTE FOR API**
+// *FALLBACK ROUTE FOR API*
 // ============================================================================
 Route::fallback(function(){
     return response()->json([

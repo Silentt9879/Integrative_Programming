@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rules\Password;
+use Illuminate\Support\Facades\Log;
 
 class AuthController extends Controller
 {
@@ -15,12 +16,12 @@ class AuthController extends Controller
     {
         return view('auth.login');
     }
-    
+
     public function showRegister()
     {
         return view('auth.register');
     }
-    
+
     /**
      * ENHANCED: Handle vehicle booking intent after login
      */
@@ -65,7 +66,7 @@ class AuthController extends Controller
             'email' => 'The provided credentials do not match our records.',
         ])->withInput($request->only('email', 'remember'));
     }
-    
+
     /**
      * ENHANCED: Handle vehicle booking intent after registration
      */
@@ -139,23 +140,23 @@ class AuthController extends Controller
 
         } catch (\Exception $e) {
             // Log the error for debugging
-            \Log::error('User registration failed: ' . $e->getMessage());
+            Log::error('User registration failed: ' . $e->getMessage());
 
             return back()
                 ->withErrors(['general' => 'Oops! Something went wrong. Please try again in a moment.'])
                 ->withInput($request->except('password', 'password_confirmation'));
         }
     }
-    
+
     public function logout(Request $request)
     {
         $userName = Auth::user()->name ?? 'User';
-        
+
         Auth::logout();
-        
+
         $request->session()->invalidate();
         $request->session()->regenerateToken();
-        
+
         return redirect()->route('login')
             ->with('success', 'Goodbye ' . $userName . '! You have been logged out successfully.');
     }
@@ -167,7 +168,7 @@ class AuthController extends Controller
     {
         $email = $request->input('email');
         $exists = User::where('email', strtolower(trim($email)))->exists();
-        
+
         return response()->json([
             'available' => !$exists,
             'message' => $exists ? 'This email is already registered.' : 'Email is available.'

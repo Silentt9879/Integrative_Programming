@@ -229,6 +229,7 @@ Route::middleware(\App\Http\Middleware\UserOnly::class)->group(function () {
         Route::get('/{booking}', [BookingController::class, 'show'])->name('show');
         Route::patch('/{booking}/cancel', [BookingController::class, 'cancel'])->name('cancel');
         Route::patch('/{booking}/confirm', [BookingController::class, 'confirm'])->name('confirm');
+        Route::patch('/{booking}/activate', [BookingController::class, 'activate'])->name('activate');
     });
 });
 

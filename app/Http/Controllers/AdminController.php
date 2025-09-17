@@ -996,75 +996,44 @@ class AdminController extends Controller {
     }
 
     //Return vehicle - calculate late fees if applicable
-    public function returnVehicle(Request $request, Booking $booking) {
-        $this->ensureAdminAccess();
+    public function returnVehicle(Request $request, $bookingId)
+{
+    $booking = Booking::with('vehicle')->findOrFail($bookingId);
 
-        $validated = $request->validate([
-            'actual_return_datetime' => 'nullable|date',
-            'damage_charges' => 'nullable|numeric|min:0',
-            'notes' => 'nullable|string|max:500',
-            'return_condition' => 'nullable|string|max:500'
-        ]);
-
-        if (!$booking->canPerformAction('complete')) {
-            return response()->json([
-                'success' => false,
-                'message' => 'This booking cannot be returned in its current state.'
-            ], 400);
-        }
-
-        $actualReturn = $validated['actual_return_datetime'] ? 
-            Carbon::parse($validated['actual_return_datetime']) : now();
-
-        // Calculate late fees
-        $lateFees = 0;
-        if ($actualReturn > $booking->return_datetime && $booking->vehicle->rentalRate) {
-            $hoursLate = $booking->return_datetime->diffInHours($actualReturn);
-            $lateFees = $hoursLate * $booking->vehicle->rentalRate->late_fee_per_hour;
-        }
-
-        $completionData = [
-            'actual_return_datetime' => $actualReturn,
-            'late_fees' => $lateFees,
-            'damage_charges' => $validated['damage_charges'] ?? 0,
-            'notes' => $validated['notes'] ?? '',
-            'return_condition' => $validated['return_condition'] ?? ''
-        ];
-
-        if ($booking->complete($completionData)) {
-            // Check if there are additional charges (late fees or damage)
-            $additionalCharges = $lateFees + ($validated['damage_charges'] ?? 0);
-            
-            if ($additionalCharges > 0) {
-                // Create a payment record for additional charges
-                $this->createAdditionalChargesPayment($booking, $additionalCharges, $lateFees, $validated['damage_charges'] ?? 0);
-                
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Vehicle returned successfully. Additional charges of RM' . number_format($additionalCharges, 2) . ' have been applied.',
-                    'newStatus' => $booking->status,
-                    'lateFees' => $lateFees,
-                    'damageCharges' => $validated['damage_charges'] ?? 0,
-                    'additionalCharges' => $additionalCharges,
-                    'finalAmount' => $booking->final_amount,
-                    'requiresPayment' => true
-                ]);
-            } else {
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Vehicle returned successfully with no additional charges.',
-                    'newStatus' => $booking->status,
-                    'finalAmount' => $booking->final_amount,
-                    'requiresPayment' => false
-                ]);
-            }
-        }
-
-        return response()->json([
-            'success' => false,
-            'message' => 'Failed to return vehicle'
-        ], 400);
+    // Validate that booking can be completed
+    if (!$booking->canPerformAction('complete')) {
+        return back()->with('error', 'Cannot complete this booking. Current status: ' . $booking->status);
     }
+
+    $data = $request->validate([
+        'damage_charges' => 'nullable|numeric|min:0',
+        'return_notes' => 'nullable|string|max:500',
+        'actual_return_datetime' => 'nullable|date'
+    ]);
+
+    // Set actual return time if not provided
+    if (!isset($data['actual_return_datetime'])) {
+        $data['actual_return_datetime'] = now();
+    }
+
+    try {
+        // Complete the booking using state pattern (this will set vehicle back to 'available')
+        $completed = $booking->complete($data);
+
+        if (!$completed) {
+            return back()->with('error', 'Unable to complete booking. Please check booking status.');
+        }
+
+        Log::info("Admin completed booking {$booking->id} and returned vehicle {$booking->vehicle->id}");
+
+        return back()->with('success', 'Vehicle returned successfully! Booking completed and vehicle is now available.');
+
+    } catch (\Exception $e) {
+        Log::error("Failed to return vehicle for booking {$booking->id}: " . $e->getMessage());
+
+        return back()->with('error', 'Failed to complete vehicle return. Please try again.');
+    }
+}
 
     /**
      * Create additional charges payment for late fees and damages

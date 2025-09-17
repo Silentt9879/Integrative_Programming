@@ -54,7 +54,7 @@ class VehicleService
      * @param int $limit
      * @return \Illuminate\Database\Eloquent\Collection
      */
-    public function getAvailableVehicles(int $limit = null)
+    public function getAvailableVehicles(?int $limit = null)
     {
         try {
             $query = Vehicle::with('rentalRate')

@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Auth;
 
 class VehicleController extends Controller
 {
@@ -44,6 +45,40 @@ class VehicleController extends Controller
 
         return view('vehicles.index', compact('vehicles'));
     }
+
+    // ========================================================================
+// **SHOW INDIVIDUAL VEHICLE WITH CACHING**
+// ========================================================================
+public function show($id)
+{
+    try {
+        // Cache individual vehicle for 15 minutes
+        $cacheKey = "vehicle_{$id}";
+
+        $vehicle = Cache::remember($cacheKey, 900, function () use ($id) {
+            return Vehicle::with('rentalRate')->findOrFail($id);
+        });
+
+        // Log vehicle view for analytics (optional)
+        Log::info('Vehicle viewed', [
+            'vehicle_id' => $vehicle->id,
+            'license_plate' => $vehicle->license_plate,
+            'viewer_id' => Auth::id(),
+            'ip' => request()->ip()
+        ]);
+
+        return view('vehicles.show', compact('vehicle'));
+
+    } catch (\Exception $e) {
+        Log::error('Error displaying vehicle', [
+            'vehicle_id' => $id,
+            'error' => $e->getMessage()
+        ]);
+
+        return redirect()->route('vehicles.index')
+                        ->with('error', 'Vehicle not found or unavailable.');
+    }
+}
 
     // ========================================================================
     // **ENHANCED STORE WITH SECURITY & ERROR HANDLING**
@@ -98,7 +133,7 @@ class VehicleController extends Controller
             // Log update for audit trail
             Log::info('Vehicle updated', [
                 'vehicle_id' => $vehicle->id,
-                'updated_by' => auth()->id(),
+                'updated_by' => Auth::id(),
                 'changes' => $vehicle->getChanges()
             ]);
 
@@ -108,7 +143,7 @@ class VehicleController extends Controller
         } catch (\InvalidArgumentException $e) {
             Log::warning('Invalid vehicle type attempted', [
                 'type' => $validated['type'] ?? 'unknown',
-                'user_id' => auth()->id()
+                'user_id' => Auth::id()
             ]);
 
             return redirect()->back()
@@ -119,7 +154,7 @@ class VehicleController extends Controller
             Log::error('Vehicle update failed', [
                 'vehicle_id' => $id,
                 'error' => $e->getMessage(),
-                'user_id' => auth()->id()
+                'user_id' => Auth::id()
             ]);
 
             return redirect()->back()
@@ -154,7 +189,7 @@ class VehicleController extends Controller
             Log::info('Vehicle deleted', [
                 'vehicle_id' => $vehicle->id,
                 'license_plate' => $vehicle->license_plate,
-                'deleted_by' => auth()->id()
+                'deleted_by' => Auth::id()
             ]);
 
             $vehicle->delete();
@@ -194,7 +229,7 @@ class VehicleController extends Controller
             Log::info('Vehicle created', [
                 'vehicle_id' => $vehicle->id,
                 'type' => $vehicle->type,
-                'created_by' => auth()->id()
+                'created_by' => Auth::id()
             ]);
 
             return redirect()->route('admin.vehicles')
@@ -207,7 +242,7 @@ class VehicleController extends Controller
         } catch (\Exception $e) {
             Log::error('Vehicle creation failed', [
                 'error' => $e->getMessage(),
-                'user_id' => auth()->id()
+                'user_id' => Auth::id()
             ]);
 
             return redirect()->back()
