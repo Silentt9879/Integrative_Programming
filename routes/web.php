@@ -96,6 +96,18 @@ use App\Http\Controllers\Observer\Enhanced\AuthController as ObserverAuthControl
 use App\Http\Controllers\Observer\Enhanced\AdminController as ObserverAdminController;
 use App\Http\Controllers\Observer\Enhanced\ReportsController as ObserverReportsController;
 
+// Observer Pattern Classes for debug routes
+use App\Http\Controllers\Observer\Subjects\UserSubject;
+use App\Http\Controllers\Observer\Subjects\BookingSubject;
+use App\Http\Controllers\Observer\Observers\EmailNotificationObserver;
+use App\Http\Controllers\Observer\Observers\LoggingObserver;
+use App\Http\Controllers\Observer\Observers\AnalyticsObserver;
+use App\Http\Controllers\Observer\Observers\AdminNotificationObserver;
+use App\Http\Controllers\Observer\Events\UserRegisteredEvent;
+use App\Http\Controllers\Observer\Events\BookingStatusChangedEvent;
+use App\Models\User;
+use App\Models\Booking;
+
 // Guest Authentication Routes (Login, Register, Password Reset)
 Route::middleware('guest')->group(function () {
     // Regular User Authentication
@@ -166,6 +178,57 @@ Route::prefix('admin')->name('admin.')->middleware(\App\Http\Middleware\AdminMid
 // Enhanced controllers with Observer Pattern for event-driven notifications
 // Handles user registration, booking changes, and report generation events
 
+// Observer Pattern Testing & Debug Routes (ADDED - Missing from original)
+Route::get('/test-observer', function () {
+    return view('test-observer');
+})->name('test.observer');
+
+Route::get('/debug-observers', function () {
+    try {
+        // Test User Subject
+        $userSubject = new UserSubject();
+        $userSubject->attach(new EmailNotificationObserver());
+        $userSubject->attach(new LoggingObserver());
+        $userSubject->attach(new AnalyticsObserver());
+        $userSubject->attach(new AdminNotificationObserver());
+
+        // Test Booking Subject
+        $bookingSubject = new BookingSubject();
+        $bookingSubject->attach(new EmailNotificationObserver());
+        $bookingSubject->attach(new LoggingObserver());
+        $bookingSubject->attach(new AdminNotificationObserver());
+
+        // Create test user with proper attributes
+        $testUser = new User();
+        $testUser->id = 999;
+        $testUser->name = 'Test User';
+        $testUser->email = 'test@example.com';
+        $testUser->phone = null;
+        $testUser->date_of_birth = null;
+        $testUser->address = null;
+        
+        // Create test event
+        $userEvent = new UserRegisteredEvent($testUser, ['source' => 'debug_test']);
+        $userSubject->notify($userEvent);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Observer test completed! Check your Laravel logs.',
+            'user_observers' => count($userSubject->getObservers()),
+            'booking_observers' => count($bookingSubject->getObservers()),
+            'log_file' => storage_path('logs/laravel.log'),
+            'test_user_id' => $testUser->id
+        ]);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Observer test failed: ' . $e->getMessage(),
+            'error_trace' => $e->getTraceAsString()
+        ], 500);
+    }
+})->name('debug.observers');
+
 Route::group(['prefix' => 'observer'], function () {
     // ========================================================================
     // **Observer Pattern - Enhanced Authentication Routes**
@@ -203,6 +266,29 @@ Route::group(['prefix' => 'observer'], function () {
         // Debug routes for Observer Pattern (development/testing)
         Route::get('/observer/booking-info', [ObserverAdminController::class, 'getObserverInfo'])->name('observer.booking.debug');
         Route::get('/observer/report-info', [ObserverReportsController::class, 'getObserverInfo'])->name('observer.report.debug');
+        
+        // ADDED - Additional debug routes for comprehensive testing
+        Route::get('/observer/user-info', function () {
+            $userSubject = new \App\Http\Controllers\Observer\Subjects\UserSubject();
+            $userSubject->attach(new \App\Http\Controllers\Observer\Observers\EmailNotificationObserver());
+            $userSubject->attach(new \App\Http\Controllers\Observer\Observers\LoggingObserver());
+            $userSubject->attach(new \App\Http\Controllers\Observer\Observers\AnalyticsObserver());
+            $userSubject->attach(new \App\Http\Controllers\Observer\Observers\AdminNotificationObserver());
+
+            $observers = [];
+            foreach ($userSubject->getObservers() as $observer) {
+                $observers[] = [
+                    'name' => $observer->getName(),
+                    'class' => get_class($observer)
+                ];
+            }
+
+            return response()->json([
+                'subject' => $userSubject->getSubjectName(),
+                'observer_count' => count($observers),
+                'observers' => $observers
+            ]);
+        })->name('observer.user.debug');
     });
 });
 
