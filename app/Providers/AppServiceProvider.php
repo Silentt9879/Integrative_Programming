@@ -20,25 +20,6 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        // Configure rate limiters for vehicle operations
-        RateLimiter::for('vehicle-creation', function (Request $request) {
-            return $request->user()
-                ? Limit::perHour(5)->by($request->user()->id)
-                : Limit::perHour(2)->by($request->ip());
-        });
-
-        RateLimiter::for('vehicle-updates', function (Request $request) {
-            return $request->user()
-                ? Limit::perHour(10)->by($request->user()->id)
-                : Limit::perHour(5)->by($request->ip());
-        });
-
-        RateLimiter::for('vehicle-deletion', function (Request $request) {
-            return $request->user()
-                ? Limit::perHour(3)->by($request->user()->id)
-                : Limit::perHour(1)->by($request->ip());
-        });
-
         // Enhanced Booking API Rate Limiting with Abuse Detection
         RateLimiter::for('booking-creation', function (Request $request) {
             return Limit::perMinute(3)->by($request->user()?->id ?: $request->ip()); // Reduced from 5 to 3

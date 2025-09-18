@@ -471,7 +471,6 @@ class AdminController extends Controller
             'current_mileage' => 'required|numeric|min:0',
             'status' => 'required|in:available,rented,maintenance',
             'description' => 'nullable|string|max:500',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'image_url' => 'nullable|url',
             'daily_rate' => 'required|numeric|min:0',
             'weekly_rate' => 'nullable|numeric|min:0',
@@ -514,59 +513,53 @@ class AdminController extends Controller
     }
 
     //Update/edit vehicle - Factory Method Pattern -Tan Xing Ye
-    public function updateVehicle(Request $request, Vehicle $vehicle)
-    {
-        $this->ensureAdminAccess();
+ public function updateVehicle(Request $request, Vehicle $vehicle)
+{
+    $this->ensureAdminAccess();
 
-        $validated = $request->validate([
-            'license_plate' => 'required|string|max:20|unique:vehicles,license_plate,' . $vehicle->id,
-            'make' => 'required|string|max:50',
-            'model' => 'required|string|max:50',
-            'year' => 'required|integer|min:1900|max:' . (date('Y') + 1),
-            'color' => 'required|string|max:30',
-            'type' => 'required|in:Sedan,SUV,Luxury,Economy,Truck,Van',
-            'seating_capacity' => 'required|integer|min:1|max:15',
-            'fuel_type' => 'required|in:Petrol,Diesel,Electric,Hybrid',
-            'current_mileage' => 'required|numeric|min:0',
-            'status' => 'required|in:available,rented,maintenance',
-            'description' => 'nullable|string|max:500',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-            'image_url' => 'nullable|url',
-            'daily_rate' => 'required|numeric|min:0',
-            'weekly_rate' => 'nullable|numeric|min:0',
-            'monthly_rate' => 'nullable|numeric|min:0'
-        ]);
+    $validated = $request->validate([
+        'license_plate' => 'required|string|max:20|unique:vehicles,license_plate,' . $vehicle->id,
+        'make' => 'required|string|max:50',
+        'model' => 'required|string|max:50',
+        'year' => 'required|integer|min:1900|max:' . (date('Y') + 1),
+        'color' => 'required|string|max:30',
+        'type' => 'required|in:Sedan,SUV,Luxury,Economy,Truck,Van',
+        'seating_capacity' => 'required|integer|min:1|max:15',
+        'fuel_type' => 'required|in:Petrol,Diesel,Electric,Hybrid',
+        'current_mileage' => 'required|numeric|min:0',
+        'status' => 'required|in:available,rented,maintenance',
+        'description' => 'nullable|string|max:500',
+        'image_url' => 'nullable|url',
+        'daily_rate' => 'required|numeric|min:0',
+        'weekly_rate' => 'nullable|numeric|min:0',
+        'monthly_rate' => 'nullable|numeric|min:0'
+    ]);
 
-        // Handle image upload
-        if ($request->hasFile('image')) {
-            // Delete old image if exists
-            if ($vehicle->image_url && Storage::disk('public')->exists(str_replace('/storage/', '', $vehicle->image_url))) {
-                Storage::disk('public')->delete(str_replace('/storage/', '', $vehicle->image_url));
-            }
-
-            $imagePath = $request->file('image')->store('vehicles', 'public');
-            $validated['image_url'] = '/storage/' . $imagePath;
-        } elseif ($request->filled('image_url')) {
-            $validated['image_url'] = $request->image_url;
-        }
-
-        //updates
-        try {
-            $creator = VehicleFactoryRegistry::getCreator($validated['type']);
-            $vehicle = $creator->updateVehicle($vehicle, $validated);
-
-            return redirect()->route('admin.vehicles')
-                ->with('success', 'Vehicle updated successfully using Factory Method Pattern!');
-        } catch (\InvalidArgumentException $e) {
-            return redirect()->back()
-                ->withErrors(['type' => 'Unsupported vehicle type: ' . $validated['type']])
-                ->withInput();
-        } catch (\Exception $e) {
-            return redirect()->back()
-                ->withErrors(['error' => 'Failed to update vehicle: ' . $e->getMessage()])
-                ->withInput();
-        }
+    // ADD THIS MISSING CODE:
+    // Handle image file if uploaded
+    if ($request->hasFile('image')) {
+        $imagePath = $request->file('image')->store('vehicles', 'public');
+        $validated['image_url'] = '/storage/' . $imagePath;
+    } elseif ($request->filled('image_url')) {
+        $validated['image_url'] = $request->image_url;
     }
+
+    try {
+        $creator = VehicleFactoryRegistry::getCreator($validated['type']);
+        $vehicle = $creator->updateVehicle($vehicle, $validated);
+
+        return redirect()->route('admin.vehicles')
+            ->with('success', 'Vehicle updated successfully using Factory Method Pattern!');
+    } catch (\InvalidArgumentException $e) {
+        return redirect()->back()
+            ->withErrors(['type' => 'Unsupported vehicle type: ' . $validated['type']])
+            ->withInput();
+    } catch (\Exception $e) {
+        return redirect()->back()
+            ->withErrors(['error' => 'Failed to update vehicle: ' . $e->getMessage()])
+            ->withInput();
+    }
+}
 
     //Delete vehicle
     public function deleteVehicle(Vehicle $vehicle)
@@ -1423,54 +1416,71 @@ class AdminController extends Controller
     }
 
     /**
- * Export bookings to PDF
- */
-public function exportBookings(Request $request)
-{
-    $this->ensureAdminAccess();
+     * Export bookings to PDF
+     */
+    public function exportBookings(Request $request)
+    {
+        $this->ensureAdminAccess();
 
-    try {
-        // Build query with filters
-        $query = Booking::with(['user', 'vehicle']);
+        try {
+            // Build query with filters
+            $query = Booking::with(['user', 'vehicle']);
 
-        // Apply same filters as in bookings() method
-        if ($request->filled('status')) {
-            $query->where('status', $request->status);
+            // Apply same filters as in bookings() method
+            if ($request->filled('status')) {
+                $query->where('status', $request->status);
+            }
+
+            if ($request->filled('search')) {
+                $search = $request->search;
+                $query->whereHas('user', function ($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%");
+                });
+            }
+
+            $bookings = $query->orderBy('created_at', 'desc')->get();
+
+            // Calculate statistics
+            $totalBookings = $bookings->count();
+            $pendingCount = $bookings->where('status', 'pending')->count();
+            $confirmedCount = $bookings->where('status', 'confirmed')->count();
+            $totalRevenue = $bookings->sum('total_amount');
+
+            // Generate PDF
+            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('admin.reports.bookings-export', [
+                'bookings' => $bookings,
+                'totalBookings' => $totalBookings,
+                'pendingCount' => $pendingCount,
+                'confirmedCount' => $confirmedCount,
+                'totalRevenue' => $totalRevenue,
+                'filters' => $request->all(),
+                'exportDate' => now()->format('F d, Y \a\t H:i:s')
+            ])->setPaper('a4', 'portrait');
+
+            return $pdf->download('bookings_export_' . now()->format('Y-m-d_H-i-s') . '.pdf');
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', 'Error generating PDF: ' . $e->getMessage());
         }
 
-        if ($request->filled('search')) {
-            $search = $request->search;
-            $query->whereHas('user', function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%");
-            });
-        }
 
-        $bookings = $query->orderBy('created_at', 'desc')->get();
-
-        // Calculate statistics
-        $totalBookings = $bookings->count();
-        $pendingCount = $bookings->where('status', 'pending')->count();
-        $confirmedCount = $bookings->where('status', 'confirmed')->count();
-        $totalRevenue = $bookings->sum('total_amount');
-
-        // Generate PDF
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('admin.reports.bookings-export', [
-            'bookings' => $bookings,
-            'totalBookings' => $totalBookings,
-            'pendingCount' => $pendingCount,
-            'confirmedCount' => $confirmedCount,
-            'totalRevenue' => $totalRevenue,
-            'filters' => $request->all(),
-            'exportDate' => now()->format('F d, Y \a\t H:i:s')
-        ])->setPaper('a4', 'portrait');
-
-        return $pdf->download('bookings_export_' . now()->format('Y-m-d_H-i-s') . '.pdf');
-
-    } catch (\Exception $e) {
-        return redirect()->back()->with('error', 'Error generating PDF: ' . $e->getMessage());
     }
-}
+
+        private function handleImageUpdate(Vehicle $vehicle, array &$validated, Request $request)
+    {
+        if ($request->hasFile('image')) {
+            // Delete old image if it exists
+            if ($vehicle->image_url && Storage::disk('public')->exists(str_replace('/storage/', '', $vehicle->image_url))) {
+                Storage::disk('public')->delete(str_replace('/storage/', '', $vehicle->image_url));
+            }
+
+            // Upload new image
+            $imagePath = $request->file('image')->store('vehicles', 'public');
+            $validated['image_url'] = '/storage/' . $imagePath;
+        } elseif ($request->filled('image_url')) {
+            $validated['image_url'] = $request->image_url;
+        }
+    }
 
     private function ensureAdminAccess()
     {

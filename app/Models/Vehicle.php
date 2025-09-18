@@ -34,12 +34,19 @@ class Vehicle extends Model
 
     public function setImageUrlAttribute($value)
     {
-        if ($value && !filter_var($value, FILTER_VALIDATE_URL)) {
-            throw new \InvalidArgumentException('Invalid image URL format');
-        }
+        if ($value) {
+            // Allow relative URLs (starting with /) or full HTTPS URLs
+            $isRelativeUrl = str_starts_with($value, '/');
+            $isValidUrl = filter_var($value, FILTER_VALIDATE_URL);
 
-        if ($value && parse_url($value, PHP_URL_SCHEME) !== 'https') {
-            throw new \InvalidArgumentException('Only HTTPS image URLs are allowed');
+            if (!$isRelativeUrl && !$isValidUrl) {
+                throw new \InvalidArgumentException('Invalid image URL format');
+            }
+
+            // If it's a full URL, ensure it's HTTPS
+            if ($isValidUrl && parse_url($value, PHP_URL_SCHEME) !== 'https') {
+                throw new \InvalidArgumentException('Only HTTPS URLs are allowed for external images');
+            }
         }
 
         $this->attributes['image_url'] = $value;

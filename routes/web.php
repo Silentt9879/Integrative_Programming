@@ -375,21 +375,17 @@ Route::prefix('admin')->name('admin.')->middleware(\App\Http\Middleware\AdminMid
     Route::get('/vehicles', [AdminController::class, 'vehicles'])->name('vehicles');
     Route::get('/vehicles/create', [AdminController::class, 'createVehicle'])->name('vehicles.create');
 
-    // Rate limited operations
     Route::post('/vehicles', [AdminController::class, 'storeVehicle'])
-        ->middleware('throttle:vehicle-creation')
-        ->name('vehicles.store');
+    ->name('vehicles.store');
 
     Route::get('/vehicles/{id}', [AdminController::class, 'showVehicle'])->name('vehicles.show');
     Route::get('/vehicles/{vehicle}/edit', [AdminController::class, 'editVehicle'])->name('vehicles.edit');
 
-    Route::put('/vehicles/{id}', [VehicleController::class, 'update'])
-        ->middleware('throttle:vehicle-updates')
-        ->name('vehicles.update');
+    Route::put('/vehicles/{vehicle}', [AdminController::class, 'updateVehicle'])
+    ->name('vehicles.update');
 
     Route::delete('/vehicles/{id}', [VehicleController::class, 'destroy'])
-        ->middleware('throttle:vehicle-deletion')
-        ->name('vehicles.destroy');
+    ->name('vehicles.destroy');
 
     Route::patch('/vehicles/{vehicle}/toggle-status', [AdminController::class, 'toggleStatus'])
         ->name('vehicles.toggle-status');

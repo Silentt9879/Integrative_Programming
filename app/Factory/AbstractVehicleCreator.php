@@ -21,7 +21,7 @@ abstract class AbstractVehicleCreator implements VehicleCreatorInterface
         return $vehicle;
     }
 
-   //Update current vehicle
+    //Update current vehicle
     public function updateVehicle(Vehicle $vehicle, array $data): Vehicle
     {
         // Apply type-specific defaults
@@ -40,7 +40,8 @@ abstract class AbstractVehicleCreator implements VehicleCreatorInterface
         $defaults = $this->getDefaults();
 
         foreach ($defaults as $key => $value) {
-            if (!isset($data[$key]) || empty($data[$key])) {
+            // Only apply defaults for missing keys, not for explicitly set values
+            if (!array_key_exists($key, $data)) {
                 $data[$key] = $value;
             }
         }
@@ -80,7 +81,7 @@ abstract class AbstractVehicleCreator implements VehicleCreatorInterface
         }
     }
 
-   // vehicle types
+    // vehicle types
 
     public static function getSupportedTypes(): array
     {

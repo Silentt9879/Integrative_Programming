@@ -152,10 +152,10 @@
                         <h5 class="mb-0"><i class="fas fa-edit me-2"></i>Update Vehicle Information</h5>
                     </div>
                     <div class="card-body">
-                        <form method="POST" action="{{ route('admin.vehicles.update', $vehicle->id) }}" novalidate>
+                        <form method="POST" action="{{ route('admin.vehicles.update', $vehicle) }}" novalidate>
                             @csrf
                             @method('PUT')
-                            
+
                             <!-- Basic Information -->
                             <div class="row mb-4">
                                 <div class="col-12">
@@ -168,7 +168,7 @@
                             <div class="row g-3 mb-4">
                                 <div class="col-md-6">
                                     <label for="make" class="form-label">Make <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control @error('make') is-invalid @enderror" 
+                                    <input type="text" class="form-control @error('make') is-invalid @enderror"
                                            id="make" name="make" value="{{ old('make', $vehicle->make) }}" required>
                                     @error('make')
                                         <div class="invalid-feedback">{{ $message }}</div>
@@ -176,7 +176,7 @@
                                 </div>
                                 <div class="col-md-6">
                                     <label for="model" class="form-label">Model <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control @error('model') is-invalid @enderror" 
+                                    <input type="text" class="form-control @error('model') is-invalid @enderror"
                                            id="model" name="model" value="{{ old('model', $vehicle->model) }}" required>
                                     @error('model')
                                         <div class="invalid-feedback">{{ $message }}</div>
@@ -187,7 +187,7 @@
                             <div class="row g-3 mb-4">
                                 <div class="col-md-4">
                                     <label for="year" class="form-label">Year <span class="text-danger">*</span></label>
-                                    <input type="number" class="form-control @error('year') is-invalid @enderror" 
+                                    <input type="number" class="form-control @error('year') is-invalid @enderror"
                                            id="year" name="year" value="{{ old('year', $vehicle->year) }}" min="1900" max="{{ date('Y')+1 }}" required>
                                     @error('year')
                                         <div class="invalid-feedback">{{ $message }}</div>
@@ -195,7 +195,7 @@
                                 </div>
                                 <div class="col-md-4">
                                     <label for="color" class="form-label">Color <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control @error('color') is-invalid @enderror" 
+                                    <input type="text" class="form-control @error('color') is-invalid @enderror"
                                            id="color" name="color" value="{{ old('color', $vehicle->color) }}" required>
                                     @error('color')
                                         <div class="invalid-feedback">{{ $message }}</div>
@@ -203,7 +203,7 @@
                                 </div>
                                 <div class="col-md-4">
                                     <label for="license_plate" class="form-label">License Plate <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control @error('license_plate') is-invalid @enderror" 
+                                    <input type="text" class="form-control @error('license_plate') is-invalid @enderror"
                                            id="license_plate" name="license_plate" value="{{ old('license_plate', $vehicle->license_plate) }}" required>
                                     @error('license_plate')
                                         <div class="invalid-feedback">{{ $message }}</div>
@@ -251,7 +251,7 @@
                                 </div>
                                 <div class="col-md-4">
                                     <label for="seating_capacity" class="form-label">Seating Capacity <span class="text-danger">*</span></label>
-                                    <input type="number" class="form-control @error('seating_capacity') is-invalid @enderror" 
+                                    <input type="number" class="form-control @error('seating_capacity') is-invalid @enderror"
                                            id="seating_capacity" name="seating_capacity" value="{{ old('seating_capacity', $vehicle->seating_capacity) }}" min="1" max="15" required>
                                     @error('seating_capacity')
                                         <div class="invalid-feedback">{{ $message }}</div>
@@ -262,7 +262,7 @@
                             <div class="row g-3 mb-4">
                                 <div class="col-md-6">
                                     <label for="current_mileage" class="form-label">Current Mileage (km) <span class="text-danger">*</span></label>
-                                    <input type="number" step="0.01" class="form-control @error('current_mileage') is-invalid @enderror" 
+                                    <input type="number" step="0.01" class="form-control @error('current_mileage') is-invalid @enderror"
                                            id="current_mileage" name="current_mileage" value="{{ old('current_mileage', $vehicle->current_mileage) }}" min="0" required>
                                     @error('current_mileage')
                                         <div class="invalid-feedback">{{ $message }}</div>
@@ -293,7 +293,7 @@
                             <div class="row g-3 mb-4">
                                 <div class="col-md-4">
                                     <label for="daily_rate" class="form-label">Daily Rate (RM) <span class="text-danger">*</span></label>
-                                    <input type="number" step="0.01" class="form-control @error('daily_rate') is-invalid @enderror" 
+                                    <input type="number" step="0.01" class="form-control @error('daily_rate') is-invalid @enderror"
                                            id="daily_rate" name="daily_rate" value="{{ old('daily_rate', $vehicle->rentalRate->daily_rate ?? 0) }}" min="0" required>
                                     @error('daily_rate')
                                         <div class="invalid-feedback">{{ $message }}</div>
@@ -301,7 +301,7 @@
                                 </div>
                                 <div class="col-md-4">
                                     <label for="weekly_rate" class="form-label">Weekly Rate (RM)</label>
-                                    <input type="number" step="0.01" class="form-control @error('weekly_rate') is-invalid @enderror" 
+                                    <input type="number" step="0.01" class="form-control @error('weekly_rate') is-invalid @enderror"
                                            id="weekly_rate" name="weekly_rate" value="{{ old('weekly_rate', $vehicle->rentalRate->weekly_rate ?? '') }}" min="0">
                                     @error('weekly_rate')
                                         <div class="invalid-feedback">{{ $message }}</div>
@@ -309,7 +309,7 @@
                                 </div>
                                 <div class="col-md-4">
                                     <label for="monthly_rate" class="form-label">Monthly Rate (RM)</label>
-                                    <input type="number" step="0.01" class="form-control @error('monthly_rate') is-invalid @enderror" 
+                                    <input type="number" step="0.01" class="form-control @error('monthly_rate') is-invalid @enderror"
                                            id="monthly_rate" name="monthly_rate" value="{{ old('monthly_rate', $vehicle->rentalRate->monthly_rate ?? '') }}" min="0">
                                     @error('monthly_rate')
                                         <div class="invalid-feedback">{{ $message }}</div>
@@ -329,8 +329,8 @@
                             <div class="row g-3 mb-4">
                                 <div class="col-12">
                                     <label for="image_url" class="form-label">Image URL</label>
-                                    <input type="url" class="form-control @error('image_url') is-invalid @enderror" 
-                                           id="image_url" name="image_url" value="{{ old('image_url', $vehicle->image_url) }}" 
+                                    <input type="url" class="form-control @error('image_url') is-invalid @enderror"
+                                           id="image_url" name="image_url" value="{{ old('image_url', $vehicle->image_url) }}"
                                            placeholder="https://example.com/vehicle-image.jpg">
                                     @error('image_url')
                                         <div class="invalid-feedback">{{ $message }}</div>
@@ -341,7 +341,7 @@
                             <div class="row g-3 mb-4">
                                 <div class="col-12">
                                     <label for="description" class="form-label">Description</label>
-                                    <textarea class="form-control @error('description') is-invalid @enderror" 
+                                    <textarea class="form-control @error('description') is-invalid @enderror"
                                               id="description" name="description" rows="3" maxlength="500">{{ old('description', $vehicle->description) }}</textarea>
                                     <div class="form-text">Optional vehicle description (max 500 characters)</div>
                                     @error('description')
@@ -407,11 +407,11 @@ document.getElementById('daily_rate').addEventListener('input', function() {
     const dailyRate = parseFloat(this.value) || 0;
     const weeklyField = document.getElementById('weekly_rate');
     const monthlyField = document.getElementById('monthly_rate');
-    
+
     if (dailyRate > 0) {
         const weeklyRate = (dailyRate * 7).toFixed(2);
         const monthlyRate = (dailyRate * 30).toFixed(2);
-        
+
         weeklyField.value = weeklyRate;
         monthlyField.value = monthlyRate;
     } else {

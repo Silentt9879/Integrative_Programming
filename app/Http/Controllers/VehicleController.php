@@ -267,15 +267,8 @@ class VehicleController extends Controller
     //Path Traversal Protection - secure coding practices -XY
     private function handleImageUpdate(Vehicle $vehicle, array &$validated, Request $request)
     {
-        if ($request->hasFile('image')) {
-            // Delete old image
-            $this->secureFileDelete($vehicle->image_url);
-
-            // Upload new image
-            $this->handleImageUpload($validated, $request);
-        } elseif ($request->filled('image_url')) {
-            $validated['image_url'] = $request->image_url;
-        }
+        // Handle image update using the dedicated method
+        $this->handleImageUpdate($vehicle, $validated, $request);
     }
 
     private function isValidImage($file): bool
@@ -288,8 +281,11 @@ class VehicleController extends Controller
 
     private function isValidImageUrl(string $url): bool
     {
-        return filter_var($url, FILTER_VALIDATE_URL) &&
-            parse_url($url, PHP_URL_SCHEME) === 'https';
+        // Allow both HTTP and HTTPS for admin flexibility
+        $isValidUrl = filter_var($url, FILTER_VALIDATE_URL);
+        $scheme = parse_url($url, PHP_URL_SCHEME);
+
+        return $isValidUrl && in_array($scheme, ['http', 'https']);
     }
 
     //Path Traversal Protection - secure coding practices -XY
@@ -425,6 +421,4 @@ class VehicleController extends Controller
         $vehicle = Vehicle::findOrFail($id);
         return view('admin.edit', compact('vehicle'));
     }
-
-
 }
