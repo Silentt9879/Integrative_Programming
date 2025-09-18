@@ -4,142 +4,129 @@ namespace App\Http\Controllers;
 
 use App\Models\Booking;
 use App\Models\Vehicle;
-use App\State\StateFactory;
+use App\Services\BookingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
 class BookingController extends Controller
 {
+    private BookingService $bookingService;
 
-    //display booking
-    public function index()
+    public function __construct(BookingService $bookingService)
     {
-        $user = Auth::user();
-
-        $bookings = Booking::with(['vehicle', 'vehicle.rentalRate'])
-            ->forUser($user->id)
-            ->orderBy('created_at', 'desc')
-            ->paginate(10);
-
-        return view('booking.index', compact('bookings'));
-    }
-
-    //show booking list
-    public function create($vehicleId)
-    {
-        $vehicle = Vehicle::with('rentalRate')->findOrFail($vehicleId);
-
-        // Check if vehicle is available
-        if ($vehicle->status !== 'available') {
-            return redirect()->route('vehicles.show', $vehicleId)
-                ->with('error', 'This vehicle is currently not available for booking.');
-        }
-
-        return view('booking.create', compact('vehicle'));
+        $this->bookingService = $bookingService;
     }
 
     /**
-     * Store a new booking
+     * Display user's bookings
+     */
+    public function index()
+    {
+        try {
+            $user = Auth::user();
+
+            $bookings = Booking::with(['vehicle', 'vehicle.rentalRate'])
+                ->forUser($user->id)
+                ->orderBy('created_at', 'desc')
+                ->paginate(10);
+
+            return view('booking.index', compact('bookings'));
+        } catch (\Exception $e) {
+            Log::error('Booking index error', [
+                'user_id' => Auth::id(),
+                'error' => $e->getMessage()
+            ]);
+
+            return redirect()->route('dashboard')
+                ->with('error', 'Unable to load your bookings. Please try again.');
+        }
+    }
+
+    /**
+     * Show booking creation form
+     */
+    public function create($vehicleId)
+    {
+        try {
+            $vehicle = Vehicle::with('rentalRate')->findOrFail($vehicleId);
+
+            // Check if vehicle is available
+            if ($vehicle->status !== 'available') {
+                return redirect()->route('vehicles.show', $vehicleId)
+                    ->with('error', 'This vehicle is currently not available for booking.');
+            }
+
+            return view('booking.create', compact('vehicle'));
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return redirect()->route('vehicles.index')
+                ->with('error', 'Vehicle not found.');
+        } catch (\Exception $e) {
+            Log::error('Booking create form error', [
+                'user_id' => Auth::id(),
+                'vehicle_id' => $vehicleId,
+                'error' => $e->getMessage()
+            ]);
+
+            return redirect()->route('vehicles.index')
+                ->with('error', 'Unable to load booking form. Please try again.');
+        }
+    }
+
+    /**
+     * Store a new booking using BookingService
      */
     public function store(Request $request)
     {
         $validated = $request->validate([
             'vehicle_id' => 'required|exists:vehicles,id',
-            'pickup_date' => 'required|date|after_or_equal:today',
+            'pickup_date' => [
+                'required',
+                'date',
+                'after_or_equal:today',
+                'before:' . now()->addMonths(12)->format('Y-m-d')
+            ],
             'pickup_time' => 'required|date_format:H:i',
             'return_date' => 'required|date|after:pickup_date',
             'return_time' => 'required|date_format:H:i',
             'pickup_location' => 'required|string|max:255',
             'return_location' => 'required|string|max:255',
-            'special_requests' => 'nullable|string|max:500',
-            'customer_phone' => 'required|string|max:20'
+            'special_requests' => [
+                'nullable',
+                'string',
+                'max:500',
+                'regex:/^[a-zA-Z0-9\s\.\,\!\?\-\(\)]*$/'
+            ],
+            'customer_phone' => [
+                'required',
+                'string',
+                'max:20',
+                'regex:/^[+]?[0-9\s\-\(\)]{8,20}$/'
+            ]
+        ], [
+            'pickup_date.before' => 'Pickup date cannot be more than 12 months in advance.',
+            'customer_phone.regex' => 'Please enter a valid phone number.',
+            'special_requests.regex' => 'Special requests contain invalid characters.'
         ]);
 
-        // Combine date and time
-        $pickupDateTime = Carbon::createFromFormat(
-            'Y-m-d H:i',
-            $validated['pickup_date'] . ' ' . $validated['pickup_time']
-        );
-        $returnDateTime = Carbon::createFromFormat(
-            'Y-m-d H:i',
-            $validated['return_date'] . ' ' . $validated['return_time']
-        );
+        try {
+            $booking = $this->bookingService->createBooking($validated);
 
-        // Validate pickup time is not in the past
-        if ($pickupDateTime <= now()) {
-            return back()->withErrors(['pickup_time' => 'Pickup time cannot be in the past.'])
-                ->withInput();
+            return redirect()->route('payment.form', $booking->id)
+                ->with('success', 'Booking created! Please complete payment to confirm your reservation.');
+
+        } catch (\Exception $e) {
+            Log::error('Booking creation error', [
+                'user_id' => Auth::id(),
+                'vehicle_id' => $validated['vehicle_id'],
+                'error' => $e->getMessage()
+            ]);
+
+            return back()
+                ->withInput()
+                ->with('error', $e->getMessage());
         }
-
-        //Validate minimum 1 hour advance booking
-        if ($pickupDateTime <= now()->addHour()) {
-            return back()->withErrors(['pickup_time' => 'Booking must be made at least 1 hour in advance.'])
-                ->withInput();
-        }
-
-        // Check if pickup time is in the past
-        if ($pickupDateTime <= now()) {
-            return back()->withErrors(['pickup_time' => 'Pickup time cannot be in the past.'])
-                ->withInput();
-        }
-
-        $user = Auth::user();
-        $vehicle = Vehicle::with('rentalRate')->findOrFail($validated['vehicle_id']);
-
-        // Combine date and time
-        $pickupDateTime = Carbon::createFromFormat(
-            'Y-m-d H:i',
-            $validated['pickup_date'] . ' ' . $validated['pickup_time']
-        );
-        $returnDateTime = Carbon::createFromFormat(
-            'Y-m-d H:i',
-            $validated['return_date'] . ' ' . $validated['return_time']
-        );
-
-        // Check vehicle availability for these dates
-        if (!$this->isVehicleAvailable($vehicle->id, $pickupDateTime, $returnDateTime)) {
-            return back()->withErrors(['dates' => 'Vehicle is not available for the selected dates.'])
-                ->withInput();
-        }
-
-        // Calculate total cost
-        $days = $pickupDateTime->diffInDays($returnDateTime) ?: 1;
-        $totalAmount = $vehicle->rentalRate->calculateRate($days);
-        $depositAmount = $totalAmount * 0.3; // 30% deposit
-
-        // Create booking
-        $booking = Booking::create([
-            'customer_name' => $user->name,
-            'customer_email' => $user->email,
-            'customer_phone' => $validated['customer_phone'],
-            'booking_number' => Booking::generateBookingNumber(),
-            'user_id' => $user->id,
-            'vehicle_id' => $vehicle->id,
-            'pickup_datetime' => $pickupDateTime,
-            'return_datetime' => $returnDateTime,
-            'pickup_location' => $validated['pickup_location'],
-            'return_location' => $validated['return_location'],
-            'total_amount' => $totalAmount,
-            'deposit_amount' => $depositAmount,
-            'status' => 'pending',
-            'payment_status' => 'pending',
-            'special_requests' => $validated['special_requests']
-        ]);
-
-        // Reserve the vehicle temporarily (set to 'rented' status to prevent double booking)
-        $vehicle->update(['status' => 'rented']);
-
-        // Clear vehicle cache when status changes
-        $this->clearVehicleCache();
-
-        // Also clear individual vehicle cache
-        Cache::forget("vehicle_{$vehicle->id}");
-
-        // Redirect to payment instead of confirmation
-        return redirect()->route('payment.form', $booking->id)
-            ->with('success', 'Booking created! Please complete payment to confirm your reservation.');
     }
 
     /**
@@ -147,166 +134,237 @@ class BookingController extends Controller
      */
     public function confirmation($bookingId)
     {
-        $booking = Booking::with(['vehicle', 'vehicle.rentalRate'])
-            ->where('id', $bookingId)
-            ->where('user_id', Auth::id())
-            ->firstOrFail();
+        try {
+            $booking = Booking::with(['vehicle', 'vehicle.rentalRate'])
+                ->where('id', $bookingId)
+                ->where('user_id', Auth::id())
+                ->firstOrFail();
 
-        return view('booking.confirmation', compact('booking'));
+            return view('booking.confirmation', compact('booking'));
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return redirect()->route('booking.index')
+                ->with('error', 'Booking not found.');
+        } catch (\Exception $e) {
+            Log::error('Booking confirmation error', [
+                'user_id' => Auth::id(),
+                'booking_id' => $bookingId,
+                'error' => $e->getMessage()
+            ]);
+
+            return redirect()->route('booking.index')
+                ->with('error', 'Unable to load booking confirmation.');
+        }
     }
 
     /**
-     * Show specific booking details
+     * Show specific booking details with State Pattern information
      */
     public function show($bookingId)
     {
-        $booking = Booking::with(['vehicle', 'vehicle.rentalRate'])
-            ->where('id', $bookingId)
-            ->where('user_id', Auth::id())
-            ->firstOrFail();
+        try {
+            $booking = $this->bookingService->getBookingWithState($bookingId, Auth::id());
 
-        // Get available actions using State Pattern
-        $availableActions = $booking->getAvailableActions();
-        $stateMessage = $booking->getStateMessage();
+            // Extract state information for view
+            $availableActions = $booking->available_actions;
+            $stateMessage = $booking->state_message;
 
-        return view('booking.show', compact('booking', 'availableActions', 'stateMessage'));
+            return view('booking.show', compact('booking', 'availableActions', 'stateMessage'));
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return redirect()->route('booking.index')
+                ->with('error', 'Booking not found.');
+        } catch (\Exception $e) {
+            Log::error('Booking show error', [
+                'user_id' => Auth::id(),
+                'booking_id' => $bookingId,
+                'error' => $e->getMessage()
+            ]);
+
+            return redirect()->route('booking.index')
+                ->with('error', 'Unable to load booking details.');
+        }
     }
 
     /**
-     * Cancel a booking - UPDATED to use State Pattern
+     * Cancel a booking using BookingService and State Pattern
      */
     public function cancel($bookingId)
     {
-        $booking = Booking::where('id', $bookingId)
-            ->where('user_id', Auth::id())
-            ->firstOrFail();
+        try {
+            $booking = Booking::where('id', $bookingId)
+                ->where('user_id', Auth::id())
+                ->firstOrFail();
 
-        // Use State Pattern to check if cancellation is allowed
-        if (!$booking->canPerformAction('cancel')) {
-            return back()->with('error', 'This booking cannot be cancelled in its current state.');
+            $this->bookingService->cancelBooking($booking, 'Cancelled by customer');
+
+            return redirect()->route('booking.index')
+                ->with('success', 'Booking cancelled successfully.');
+
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return redirect()->route('booking.index')
+                ->with('error', 'Booking not found.');
+        } catch (\Exception $e) {
+            Log::error('Booking cancellation error', [
+                'user_id' => Auth::id(),
+                'booking_id' => $bookingId,
+                'error' => $e->getMessage()
+            ]);
+
+            return back()->with('error', $e->getMessage());
         }
-
-        // Use State Pattern method to cancel
-        $cancelled = $booking->cancel('Cancelled by customer');
-
-        if (!$cancelled) {
-            return back()->with('error', 'Unable to cancel booking. It may be too close to pickup time.');
-        }
-
-        // Clear cache when booking is cancelled (vehicle becomes available again)
-        $this->clearVehicleCache();
-
-        return redirect()->route('booking.index')
-            ->with('success', 'Booking cancelled successfully.');
     }
 
     /**
-     * Confirm booking - UPDATED to use State Pattern
+     * Confirm booking using BookingService and State Pattern
      */
     public function confirm($bookingId)
     {
-        $booking = Booking::where('id', $bookingId)
-            ->where('user_id', Auth::id())
-            ->firstOrFail();
+        try {
+            $booking = Booking::where('id', $bookingId)
+                ->where('user_id', Auth::id())
+                ->firstOrFail();
 
-        // Check if confirmation action is available
-        if (!$booking->canPerformAction('confirm')) {
             if ($booking->requiresPayment()) {
                 return redirect()->route('payment.form', $booking->id)
                     ->with('info', 'Please complete payment to confirm your booking.');
             }
-            return back()->with('error', 'This booking cannot be confirmed in its current state.');
+
+            $this->bookingService->confirmBooking($booking);
+
+            return redirect()->route('booking.show', $booking->id)
+                ->with('success', 'Booking confirmed successfully!');
+
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return redirect()->route('booking.index')
+                ->with('error', 'Booking not found.');
+        } catch (\Exception $e) {
+            Log::error('Booking confirmation error', [
+                'user_id' => Auth::id(),
+                'booking_id' => $bookingId,
+                'error' => $e->getMessage()
+            ]);
+
+            return back()->with('error', $e->getMessage());
         }
-
-        // Use State Pattern to confirm booking
-        $confirmed = $booking->confirm();
-
-        if (!$confirmed) {
-            return back()->with('error', 'Unable to confirm booking. Please ensure payment is completed.');
-        }
-
-        return redirect()->route('booking.show', $booking->id)
-            ->with('success', 'Booking confirmed successfully!');
     }
 
     /**
-     * Activate booking (mark as picked up) - NEW METHOD using State Pattern
+     * Activate booking (mark as picked up) using BookingService and State Pattern
      */
     public function activate($bookingId)
     {
-        $booking = Booking::where('id', $bookingId)
-            ->where('user_id', Auth::id())
-            ->firstOrFail();
+        try {
+            $booking = Booking::where('id', $bookingId)
+                ->where('user_id', Auth::id())
+                ->firstOrFail();
 
-        // Check if activation is allowed
-        if (!$booking->canPerformAction('activate')) {
-            return back()->with('error', 'Cannot activate booking. The pickup time may not have arrived yet.');
+            $this->bookingService->activateBooking($booking);
+
+            return redirect()->route('booking.show', $booking->id)
+                ->with('success', 'Vehicle pickup confirmed. Rental is now active!');
+
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return redirect()->route('booking.index')
+                ->with('error', 'Booking not found.');
+        } catch (\Exception $e) {
+            Log::error('Booking activation error', [
+                'user_id' => Auth::id(),
+                'booking_id' => $bookingId,
+                'error' => $e->getMessage()
+            ]);
+
+            return back()->with('error', $e->getMessage());
         }
-
-        // Use State Pattern to activate
-        $activated = $booking->activate();
-
-        if (!$activated) {
-            return back()->with('error', 'Unable to activate booking.');
-        }
-
-        return redirect()->route('booking.show', $booking->id)
-            ->with('success', 'Vehicle pickup confirmed. Rental is now active!');
     }
 
     /**
-     * Complete booking (mark as returned) - NEW METHOD using State Pattern
+     * Complete booking (mark as returned) using BookingService and State Pattern
      */
     public function complete(Request $request, $bookingId)
     {
-        $booking = Booking::where('id', $bookingId)
-            ->where('user_id', Auth::id())
-            ->firstOrFail();
-
-        // Check if completion is allowed
-        if (!$booking->canPerformAction('complete')) {
-            return back()->with('error', 'Cannot complete booking. The rental may still be active.');
-        }
-
-        $data = $request->validate([
-            'damage_charges' => 'nullable|numeric|min:0',
-            'return_notes' => 'nullable|string|max:500'
+        $validated = $request->validate([
+            'damage_charges' => 'nullable|numeric|min:0|max:999999.99',
+            'return_notes' => [
+                'nullable',
+                'string',
+                'max:500',
+                'regex:/^[a-zA-Z0-9\s\.\,\!\?\-\(\)]*$/'
+            ]
+        ], [
+            'return_notes.regex' => 'Return notes contain invalid characters.',
+            'damage_charges.max' => 'Damage charges amount is too high.'
         ]);
 
-        // Use State Pattern to complete booking
-        $completed = $booking->complete($data);
+        try {
+            $booking = Booking::where('id', $bookingId)
+                ->where('user_id', Auth::id())
+                ->firstOrFail();
 
-        if (!$completed) {
-            return back()->with('error', 'Unable to complete booking.');
+            $this->bookingService->completeBooking($booking, $validated);
+
+            return redirect()->route('booking.show', $booking->id)
+                ->with('success', 'Booking completed successfully!');
+
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return redirect()->route('booking.index')
+                ->with('error', 'Booking not found.');
+        } catch (\Exception $e) {
+            Log::error('Booking completion error', [
+                'user_id' => Auth::id(),
+                'booking_id' => $bookingId,
+                'error' => $e->getMessage()
+            ]);
+
+            return back()->with('error', $e->getMessage());
         }
-
-        // Clear cache when booking is completed (vehicle becomes available again)
-        $this->clearVehicleCache();
-
-        return redirect()->route('booking.show', $booking->id)
-            ->with('success', 'Booking completed successfully!');
     }
 
     /**
-     * Check vehicle availability
+     * Check vehicle availability (AJAX endpoint using BookingService)
      */
     public function checkAvailability(Request $request)
     {
-        $request->validate([
+        $validated = $request->validate([
             'vehicle_id' => 'required|exists:vehicles,id',
-            'pickup_date' => 'required|date',
-            'return_date' => 'required|date|after:pickup_date'
+            'pickup_date' => 'required|date|after_or_equal:today',
+            'pickup_time' => 'required|date_format:H:i',
+            'return_date' => 'required|date|after:pickup_date',
+            'return_time' => 'required|date_format:H:i'
         ]);
 
-        $pickupDate = Carbon::parse($request->pickup_date);
-        $returnDate = Carbon::parse($request->return_date);
+        try {
+            $pickupDateTime = Carbon::createFromFormat(
+                'Y-m-d H:i',
+                $validated['pickup_date'] . ' ' . $validated['pickup_time']
+            );
 
-        $isAvailable = $this->isVehicleAvailable($request->vehicle_id, $pickupDate, $returnDate);
+            $returnDateTime = Carbon::createFromFormat(
+                'Y-m-d H:i',
+                $validated['return_date'] . ' ' . $validated['return_time']
+            );
 
-        return response()->json([
-            'available' => $isAvailable,
-            'message' => $isAvailable ? 'Vehicle is available' : 'Vehicle is not available for selected dates'
-        ]);
+            $isAvailable = $this->bookingService->isVehicleAvailable(
+                $validated['vehicle_id'],
+                $pickupDateTime,
+                $returnDateTime
+            );
+
+            return response()->json([
+                'available' => $isAvailable,
+                'message' => $isAvailable ? 'Vehicle is available' : 'Vehicle is not available for selected dates'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Availability check error', [
+                'user_id' => Auth::id() ?? 'guest',
+                'vehicle_id' => $validated['vehicle_id'] ?? null,
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json([
+                'available' => false,
+                'message' => 'Unable to check availability. Please try again.'
+            ], 500);
+        }
     }
 
     /**
@@ -315,31 +373,51 @@ class BookingController extends Controller
     public function search(Request $request)
     {
         $validated = $request->validate([
-            'pickup_date' => 'required|date|after_or_equal:today',
+            'pickup_date' => [
+                'required',
+                'date',
+                'after_or_equal:today',
+                'before:' . now()->addMonths(12)->format('Y-m-d')
+            ],
             'return_date' => 'required|date|after:pickup_date',
-            'vehicle_type' => 'nullable|string',
-            'location' => 'nullable|string'
+            'vehicle_type' => 'nullable|string|in:Economy,Sedan,SUV,Luxury,Truck,Van',
+            'location' => 'nullable|string|max:255'
+        ], [
+            'pickup_date.before' => 'Pickup date cannot be more than 12 months in advance.',
+            'vehicle_type.in' => 'Invalid vehicle type selected.'
         ]);
 
-        $pickupDate = Carbon::parse($validated['pickup_date']);
-        $returnDate = Carbon::parse($validated['return_date']);
+        try {
+            $pickupDate = Carbon::parse($validated['pickup_date']);
+            $returnDate = Carbon::parse($validated['return_date']);
 
-        // Get available vehicles
-        $query = Vehicle::with('rentalRate')
-            ->where('status', 'available');
+            // Get available vehicles
+            $query = Vehicle::with('rentalRate')
+                ->where('status', 'available');
 
-        if ($request->filled('vehicle_type')) {
-            $query->where('type', $validated['vehicle_type']);
+            if ($request->filled('vehicle_type')) {
+                $query->where('type', $validated['vehicle_type']);
+            }
+
+            $allVehicles = $query->get();
+
+            // Filter by availability using service
+            $availableVehicles = $allVehicles->filter(function ($vehicle) use ($pickupDate, $returnDate) {
+                return $this->bookingService->isVehicleAvailable($vehicle->id, $pickupDate, $returnDate);
+            });
+
+            return view('booking.search', compact('availableVehicles', 'pickupDate', 'returnDate', 'validated'));
+
+        } catch (\Exception $e) {
+            Log::error('Vehicle search error', [
+                'user_id' => Auth::id() ?? 'guest',
+                'search_params' => $validated ?? [],
+                'error' => $e->getMessage()
+            ]);
+
+            return redirect()->route('booking.search-form')
+                ->with('error', 'Unable to search vehicles. Please try again.');
         }
-
-        $allVehicles = $query->get();
-
-        // Filter by availability
-        $availableVehicles = $allVehicles->filter(function ($vehicle) use ($pickupDate, $returnDate) {
-            return $this->isVehicleAvailable($vehicle->id, $pickupDate, $returnDate);
-        });
-
-        return view('booking.search', compact('availableVehicles', 'pickupDate', 'returnDate', 'validated'));
     }
 
     /**
@@ -351,53 +429,28 @@ class BookingController extends Controller
     }
 
     /**
-     * Clear vehicle listing cache when availability changes
+     * Export bookings to PDF (for admin or user reports)
      */
-    private function clearVehicleCache(): void
+    public function exportPDF(Request $request)
     {
-        // Clear vehicle listing cache when availability changes
-        $commonFilters = ['', 'type=Economy', 'type=Luxury', 'type=Sedan', 'type=SUV', 'type=Van', 'type=Truck'];
+        try {
+            // This would integrate with your existing PDF export functionality
+            // For now, return a placeholder response
+            return response()->json([
+                'message' => 'PDF export functionality will be integrated with existing reports module',
+                'available_endpoints' => [
+                    'user_reports' => route('user.reports.booking-report'),
+                    'admin_reports' => route('admin.reports.export')
+                ]
+            ]);
 
-        foreach ($commonFilters as $filter) {
-            $filterArray = [];
-            if (!empty($filter)) {
-                parse_str($filter, $filterArray);
-            }
-            $key = 'vehicles_' . md5(serialize($filterArray));
-            Cache::forget($key);
+        } catch (\Exception $e) {
+            Log::error('Booking PDF export error', [
+                'user_id' => Auth::id(),
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json(['error' => 'Export failed'], 500);
         }
-
-        // Clear the base cache key (no filters)
-        Cache::forget('vehicles_' . md5(''));
-
-        // Also clear some common search combinations
-        $searchCombos = ['search=toyota', 'search=bmw', 'year=2020', 'year=2021', 'year=2022'];
-        foreach ($searchCombos as $combo) {
-            parse_str($combo, $comboArray);
-            $key = 'vehicles_' . md5(serialize($comboArray));
-            Cache::forget($key);
-        }
-    }
-
-    /**
-     * Private method to check vehicle availability
-     */
-    private function isVehicleAvailable($vehicleId, $pickupDate, $returnDate)
-    {
-        // Check for overlapping bookings
-        $overlappingBookings = Booking::where('vehicle_id', $vehicleId)
-            ->whereIn('status', ['confirmed', 'active'])
-            ->whereIn('payment_status', ['paid', 'partial'])
-            ->where(function ($query) use ($pickupDate, $returnDate) {
-                $query->whereBetween('pickup_datetime', [$pickupDate, $returnDate])
-                    ->orWhereBetween('return_datetime', [$pickupDate, $returnDate])
-                    ->orWhere(function ($subQuery) use ($pickupDate, $returnDate) {
-                        $subQuery->where('pickup_datetime', '<=', $pickupDate)
-                            ->where('return_datetime', '>=', $returnDate);
-                    });
-            })
-            ->exists();
-
-        return !$overlappingBookings;
     }
 }

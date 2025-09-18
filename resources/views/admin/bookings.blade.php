@@ -81,6 +81,11 @@
             color: white;
         }
 
+        .status-active {
+            background: linear-gradient(45deg, #007bff, #0056b3);
+            color: white;
+        }
+
         .status-pending {
             background: linear-gradient(45deg, #ffc107, #fd7e14);
             color: white;
@@ -308,6 +313,8 @@
                                     </option>
                                     <option value="confirmed" {{ request('status') == 'confirmed' ? 'selected' : '' }}>
                                         Confirmed</option>
+                                    <option value="active" {{ request('status') == 'active' ? 'selected' : '' }}>Active
+                                    </option>
                                     <option value="completed" {{ request('status') == 'completed' ? 'selected' : '' }}>
                                         Completed</option>
                                     <option value="cancelled" {{ request('status') == 'cancelled' ? 'selected' : '' }}>
@@ -432,8 +439,12 @@
                                                 title="View Details">
                                                 <i class="fas fa-eye"></i>
                                             </button>
-                                            @if ($booking->status === 'confirmed')
-                                                <button class="action-btn btn-success"
+                                            @if (
+                                                ($booking->status ?? 'pending') === 'confirmed' ||
+                                                    !isset($booking) ||
+                                                    ($booking->status ?? 'pending') === 'pending')
+                                                <button class="action-btn btn-success pickup-btn"
+                                                    data-booking-id="{{ $booking->id ?? rand(1, 999) }}"
                                                     onclick="pickupVehicle({{ $booking->id ?? rand(1, 999) }})"
                                                     title="Vehicle Picked Up">
                                                     <i class="fas fa-car"></i>
@@ -618,15 +629,21 @@
 
         function showAlert(message, type) {
             const alertDiv = document.createElement('div');
-            alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+            alertDiv.className = `alert alert-${type === 'error' ? 'danger' : type} alert-dismissible fade show`;
+
+            const icon = type === 'success' ? 'fa-check-circle' :
+                type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle';
+
             alertDiv.innerHTML = `
-            <i class="fas fa-check-circle me-2"></i>${message}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        `;
+        <i class="fas ${icon} me-2"></i>${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
             const container = document.querySelector('.container');
             container.insertBefore(alertDiv, container.firstChild);
             setTimeout(() => {
-                alertDiv.remove();
+                if (alertDiv.parentNode) {
+                    alertDiv.remove();
+                }
             }, 5000);
         }
 
@@ -745,7 +762,12 @@
                             'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
                         }
                     })
-                    .then(response => response.json())
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+                        return response.json();
+                    })
                     .then(data => {
                         hideLoading();
 
@@ -754,7 +776,8 @@
                             // Update status badge
                             const statusBadge = document.getElementById(`booking-status-${id}`);
                             if (statusBadge) {
-                                statusBadge.className = 'status-badge status-confirmed';
+                                statusBadge.className =
+                                    'status-badge status-active'; // Changed from status-confirmed to status-active
                                 statusBadge.textContent = 'Active';
                             }
                             // Refresh page

@@ -10,14 +10,8 @@ class ConfirmedState extends BookingState
     public function getAvailableActions(): array
 {
     $actions = ['view'];
-
-    // TESTING: Always allow cancel for confirmed bookings
     $actions[] = 'cancel';
-
-    // active when pickup date has arrived
-    if ($this->booking->pickup_datetime <= now()) {
-        $actions[] = 'activate';
-    }
+    $actions[] = 'activate';
 
     return $actions;
 }
@@ -25,7 +19,7 @@ class ConfirmedState extends BookingState
     public function getStateMessage(): string
     {
         return 'Booking confirmed! Vehicle will be ready for pickup on ' .
-               $this->booking->pickup_datetime->format('M d, Y') . '.';
+            $this->booking->pickup_datetime->format('M d, Y') . '.';
     }
 
     public function getBadgeColor(): string
@@ -49,32 +43,35 @@ class ConfirmedState extends BookingState
     }
 
     public function activate(): bool
-{
-    if (!$this->canTransitionTo('active')) {
-        return false;
+    {
+        if (!$this->canTransitionTo('active')) {
+            return false;
+        }
+
+        // Admin can activate anytime (no time restriction)
+        $this->updateBookingStatus('active', [
+            'pickup_confirmed_at' => now()
+        ]);
+
+        // Ensure vehicle status is properly set
+        $this->updateVehicleStatus('rented');
+
+        return true;
     }
-
-    // No time check - admin can activate anytime
-    $this->updateBookingStatus('active');
-    // Vehicle remains 'rented'
-
-    return true;
-}
 
     public function cancel(string $reason = 'Cancelled by customer'): bool
-{
-    if (!$this->canTransitionTo('cancelled')) {
-        return false;
+    {
+        if (!$this->canTransitionTo('cancelled')) {
+            return false;
+        }
+
+        $this->updateBookingStatus('cancelled', [
+            'payment_status' => 'cancelled',
+            'cancellation_reason' => $reason
+        ]);
+
+        $this->updateVehicleStatus('available');
+
+        return true;
     }
-
-    $this->updateBookingStatus('cancelled', [
-        'payment_status' => 'cancelled',
-        'cancellation_reason' => $reason
-    ]);
-
-    $this->updateVehicleStatus('available');
-
-    return true;
-}
-
 }
