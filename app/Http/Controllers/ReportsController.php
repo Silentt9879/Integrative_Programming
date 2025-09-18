@@ -62,26 +62,36 @@ class ReportsController extends Controller
     }
 
     /**
-     * Export PDF report
-     */
+    * Export PDF report
+    */
     public function exportPDF(Request $request)
     {
         try {
             $dateFrom = $request->date_from ? Carbon::parse($request->date_from) : Carbon::now()->subYears(2);
             $dateTo = $request->date_to ? Carbon::parse($request->date_to) : Carbon::now()->endOfDay();
-            $reportType = $request->report_type ?? 'overview';
+                    $reportType = $request->report_type ?? 'overview';
 
-            // Get data based on report type
-            $data = $this->getReportData($dateFrom, $dateTo, $reportType);
+            // Get basic stats
+            $stats = $this->getBasicStats($dateFrom, $dateTo);
+
+            // Get chart data
+            $chartData = $this->getChartData($dateFrom, $dateTo);
+
+            // Get table data
+            $tableData = $this->getTableData($dateFrom, $dateTo);
 
             $filename = 'rentwheels_report_' . $dateFrom->format('Y-m-d') . '_to_' . $dateTo->format('Y-m-d');
 
             // Generate PDF
-            $pdf = Pdf::loadView('admin.reports.pdf', [
-                'data' => $data,
-                'reportType' => $reportType,
+            $pdf = Pdf::loadView('reports.total-report', [
+                'reportTitle' => 'RentWheels ' . ucfirst($reportType) . ' Report',
+                'generatedAt' => Carbon::now(),
                 'dateFrom' => $dateFrom,
                 'dateTo' => $dateTo,
+                'reportType' => $reportType,
+                'stats' => $stats,
+                'chartData' => $chartData,
+                'tableData' => $tableData,
             ])->setPaper('a4', 'portrait');
 
             return $pdf->download($filename . '.pdf');
@@ -92,32 +102,28 @@ class ReportsController extends Controller
 
     /**
      * Get basic statistics
-     */
+    */
     private function getBasicStats($dateFrom, $dateTo)
     {
-        $totalRevenue = Booking::whereBetween('created_at', [$dateFrom, $dateTo])
-            ->whereIn('status', ['completed', 'active', 'confirmed'])
+        // Simplified - get ALL data to test
+        $totalRevenue = Booking::whereIn('status', ['completed', 'active', 'confirmed'])
             ->sum('total_amount');
 
-        // Changed from activeRentals to totalVehicles to match AdminController
         $totalVehicles = Vehicle::count();
 
-        $totalBookings = Booking::whereBetween('created_at', [$dateFrom, $dateTo])->count();
+        $totalBookings = Booking::count();
 
-        $totalUsers = User::whereBetween('created_at', [$dateFrom, $dateTo])->count();
+        $totalUsers = User::count();
 
-        // Calculate utilization rate based on active rentals
-        $activeRentals = Booking::where('status', 'active')
-            ->whereBetween('pickup_datetime', [$dateFrom, $dateTo])
-            ->count();
+        $activeRentals = Booking::where('status', 'active')->count();
 
         $utilizationRate = $totalVehicles > 0 ?
             round(($activeRentals / $totalVehicles) * 100, 2) : 0;
 
         return [
             'totalRevenue' => $totalRevenue,
-            'totalVehicles' => $totalVehicles, // Changed from activeRentals
-            'totalBookings' => $totalBookings,
+            'totalVehicles' => $totalVehicles,
+                'totalBookings' => $totalBookings,
             'totalUsers' => $totalUsers,
             'utilizationRate' => $utilizationRate
         ];
@@ -175,16 +181,13 @@ class ReportsController extends Controller
 
     /**
      * Get table data for dashboard
-     */
+    */
     private function getTableData($dateFrom, $dateTo)
     {
-        // Top users by bookings
-        $topUsers = User::withCount(['bookings' => function ($query) use ($dateFrom, $dateTo) {
-                $query->whereBetween('created_at', [$dateFrom, $dateTo]);
-            }])
-            ->withSum(['bookings as total_spent' => function ($query) use ($dateFrom, $dateTo) {
-                $query->whereBetween('created_at', [$dateFrom, $dateTo])
-                    ->whereIn('status', ['completed', 'active', 'confirmed']);
+        // Simplified - get ALL data to test
+        $topUsers = User::withCount('bookings')
+            ->withSum(['bookings as total_spent' => function ($query) {
+                $query->whereIn('status', ['completed', 'active', 'confirmed']);
             }], 'total_amount')
             ->having('bookings_count', '>', 0)
             ->orderByDesc('bookings_count')
@@ -200,22 +203,12 @@ class ReportsController extends Controller
                 ];
             });
 
-        // Vehicle performance
-        $vehiclePerformance = Vehicle::withCount(['bookings' => function ($query) use ($dateFrom, $dateTo) {
-                $query->whereBetween('created_at', [$dateFrom, $dateTo]);
-            }])
-            ->withSum(['bookings as revenue_generated' => function ($query) use ($dateFrom, $dateTo) {
-                $query->whereBetween('created_at', [$dateFrom, $dateTo])
-                    ->whereIn('status', ['completed', 'active', 'confirmed']);
+        $vehiclePerformance = Vehicle::withCount('bookings')
+            ->withSum(['bookings as revenue_generated' => function ($query) {
+                $query->whereIn('status', ['completed', 'active', 'confirmed']);
             }], 'total_amount')
             ->get()
             ->map(function ($vehicle) {
-                // Calculate utilization rate for each vehicle
-                $totalDaysInPeriod = 30; // You can make this dynamic based on date range
-                $bookingDays = $vehicle->bookings_count; // Simplified calculation
-                $utilizationRate = $totalDaysInPeriod > 0 ?
-                    round(($bookingDays / $totalDaysInPeriod) * 100, 2) : 0;
-
                 return [
                     'make' => $vehicle->make,
                     'model' => $vehicle->model,
@@ -223,13 +216,11 @@ class ReportsController extends Controller
                     'status' => $vehicle->status,
                     'total_bookings' => $vehicle->bookings_count,
                     'revenue_generated' => $vehicle->revenue_generated ?? 0,
-                    'utilization_rate' => $utilizationRate
+                    'utilization_rate' => $vehicle->bookings_count * 10 // Simplified calculation
                 ];
             });
 
-        // Recent bookings
         $recentBookings = Booking::with(['user', 'vehicle'])
-            ->whereBetween('created_at', [$dateFrom, $dateTo])
             ->orderByDesc('created_at')
             ->limit(20)
             ->get()
@@ -246,7 +237,8 @@ class ReportsController extends Controller
                     'start_date' => $booking->pickup_datetime,
                     'end_date' => $booking->return_datetime,
                     'total_amount' => $booking->total_amount,
-                    'status' => $booking->status
+                    'status' => $booking->status,
+                    'created_at' => $booking->created_at
                 ];
             });
 
