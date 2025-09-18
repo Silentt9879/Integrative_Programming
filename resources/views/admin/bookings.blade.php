@@ -563,45 +563,35 @@
 
         function viewBooking(id) {
             showLoading();
-            setTimeout(() => {
-                hideLoading();
-                const bookingDetails = `
-                <div class="row">
-                    <div class="col-md-6">
-                        <h6>Booking Information</h6>
-                        <p><strong>Booking ID:</strong> #BK${String(id).padStart(4, '0')}</p>
-                        <p><strong>Customer:</strong> Adam</p>
-                        <p><strong>Email:</strong> adam@gmail.com</p>
-                        <p><strong>Phone:</strong> +60123456789</p>
-                    </div>
-                    <div class="col-md-6">
-                        <h6>Vehicle Information</h6>
-                        <p><strong>Vehicle:</strong> Perodua Myvi</p>
-                        <p><strong>License Plate:</strong> ABC123</p>
-                        <p><strong>Type:</strong> Economy</p>
-                        <p><strong>Daily Rate:</strong> RM123.00</p>
-                    </div>
-                </div>
-                <hr>
-                <div class="row">
-                    <div class="col-md-6">
-                        <h6>Rental Period</h6>
-                        <p><strong>Start Date:</strong> ${new Date().toLocaleDateString()}</p>
-                        <p><strong>End Date:</strong> ${new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toLocaleDateString()}</p>
-                        <p><strong>Duration:</strong> 3 days</p>
-                    </div>
-                    <div class="col-md-6">
-                        <h6>Payment Information</h6>
-                        <p><strong>Subtotal:</strong> RM369.00</p>
-                        <p><strong>Tax:</strong> RM36.90</p>
-                        <p><strong>Total Amount:</strong> <span class="text-success">RM405.90</span></p>
-                    </div>
-                </div>
-            `;
-                document.getElementById('bookingDetailsContent').innerHTML = bookingDetails;
-                const modal = new bootstrap.Modal(document.getElementById('viewBookingModal'));
-                modal.show();
-            }, 800);
+
+            fetch(`/admin/bookings/${id}`, {
+                    method: 'GET',
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'Accept': 'application/json'
+                    }
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    hideLoading();
+
+                    if (data.success) {
+                        document.getElementById('bookingDetailsContent').innerHTML = data.html;
+                        const modal = new bootstrap.Modal(document.getElementById('viewBookingModal'));
+                        modal.show();
+                    } else {
+                        showAlert('Error loading booking details', 'error');
+                    }
+                })
+                .catch(error => {
+                    hideLoading();
+                    showAlert('Error loading booking details: ' + error.message, 'error');
+                });
         }
 
         function exportBookings() {

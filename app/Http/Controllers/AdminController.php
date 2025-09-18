@@ -44,11 +44,12 @@ class AdminController extends Controller
     /**
      * Handle admin login submission
      */
-    public function login(Request $request) {
+    public function login(Request $request)
+    {
         // Additional check: If user is already logged in
         if (Auth::check()) {
             $user = Auth::user();
-                if ($user->is_admin) {
+            if ($user->is_admin) {
                 return redirect()->route('admin.dashboard');
             } else {
                 Auth::logout(); // Logout regular user before admin login attempt
@@ -68,8 +69,8 @@ class AdminController extends Controller
 
         if ($validator->fails()) {
             return back()
-                            ->withErrors($validator)
-                            ->withInput($request->only('email'));
+                ->withErrors($validator)
+                ->withInput($request->only('email'));
         }
 
         // Get credentials
@@ -84,28 +85,28 @@ class AdminController extends Controller
             if (!$user->is_admin) {
                 Auth::logout();
                 return back()->withErrors([
-                            'email' => 'Access denied. Admin privileges required. This incident has been logged.'
-                        ])->withInput($request->only('email'));
+                    'email' => 'Access denied. Admin privileges required. This incident has been logged.'
+                ])->withInput($request->only('email'));
             }
 
             // Check if admin account is active
             if ($user->status !== 'active') {
                 Auth::logout();
                 return back()->withErrors([
-                            'email' => 'Your admin account has been suspended.'
-                        ])->withInput($request->only('email'));
+                    'email' => 'Your admin account has been suspended.'
+                ])->withInput($request->only('email'));
             }
 
             $request->session()->regenerate();
 
             return redirect()->route('admin.dashboard')
-                            ->with('success', 'Welcome back, Admin ' . $user->name . '!');
+                ->with('success', 'Welcome back, Admin ' . $user->name . '!');
         }
 
         // Authentication failed
         return back()->withErrors([
-                    'email' => 'The provided credentials do not match our admin records.',
-                ])->withInput($request->only('email'));
+            'email' => 'The provided credentials do not match our admin records.',
+        ])->withInput($request->only('email'));
     }
 
     /**
@@ -719,7 +720,7 @@ class AdminController extends Controller
     {
         $this->ensureAdminAccess();
 
-        $booking->load(['user', 'vehicle']);
+        $booking->load(['user', 'vehicle', 'vehicle.rentalRate']);
 
         $booking->availableActions = $booking->getAvailableActions();
         $booking->stateMessage = $booking->getStateMessage();
@@ -736,7 +737,50 @@ class AdminController extends Controller
             'cancelled' => $booking->canTransitionTo('cancelled')
         ];
 
-        $html = view('admin.partials.booking-details', compact('booking'))->render();
+        // Generate HTML directly instead of using partial view
+        $html = '
+    <div class="row">
+        <div class="col-md-6">
+            <h6>Booking Information</h6>
+            <p><strong>Booking ID:</strong> ' . ($booking->booking_number ?? '#BK' . str_pad($booking->id, 4, '0', STR_PAD_LEFT)) . '</p>
+            <p><strong>Customer:</strong> ' . ($booking->user->name ?? 'N/A') . '</p>
+            <p><strong>Email:</strong> ' . ($booking->user->email ?? 'N/A') . '</p>
+            <p><strong>Phone:</strong> ' . ($booking->customer_phone ?? 'N/A') . '</p>
+        </div>
+        <div class="col-md-6">
+            <h6>Vehicle Information</h6>
+            <p><strong>Vehicle:</strong> ' . ($booking->vehicle->make ?? 'N/A') . ' ' . ($booking->vehicle->model ?? '') . '</p>
+            <p><strong>License Plate:</strong> ' . ($booking->vehicle->license_plate ?? 'N/A') . '</p>
+            <p><strong>Type:</strong> ' . ($booking->vehicle->type ?? 'N/A') . '</p>
+            <p><strong>Daily Rate:</strong> RM' . number_format($booking->vehicle->rentalRate->daily_rate ?? 0, 2) . '</p>
+        </div>
+    </div>
+    <hr>
+    <div class="row">
+        <div class="col-md-6">
+            <h6>Rental Period</h6>
+            <p><strong>Start Date:</strong> ' . ($booking->pickup_datetime ? $booking->pickup_datetime->format('M d, Y H:i') : 'N/A') . '</p>
+            <p><strong>End Date:</strong> ' . ($booking->return_datetime ? $booking->return_datetime->format('M d, Y H:i') : 'N/A') . '</p>
+            <p><strong>Duration:</strong> ' . ($booking->rental_days ?? 0) . ' days</p>
+        </div>
+        <div class="col-md-6">
+            <h6>Payment Information</h6>
+            <p><strong>Total Amount:</strong> <span class="text-success">RM' . number_format($booking->total_amount ?? 0, 2) . '</span></p>
+            <p><strong>Payment Status:</strong> <span class="badge bg-' . ($booking->payment_status === 'paid' ? 'success' : 'warning') . '">' . ucfirst($booking->payment_status ?? 'pending') . '</span></p>
+            <p><strong>Booking Status:</strong> <span class="badge bg-primary">' . ucfirst($booking->status ?? 'pending') . '</span></p>
+        </div>
+    </div>';
+
+        if ($booking->special_requests) {
+            $html .= '
+        <hr>
+        <div class="row">
+            <div class="col-12">
+                <h6>Special Requests</h6>
+                <p>' . htmlspecialchars($booking->special_requests) . '</p>
+            </div>
+        </div>';
+        }
 
         return response()->json([
             'success' => true,
