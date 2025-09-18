@@ -354,6 +354,9 @@ Route::patch('/bookings/{booking}/return', [AdminController::class, 'returnVehic
 
     // Booking Export Route
 Route::get('/bookings/export', [AdminController::class, 'exportBookings'])->name('bookings.export');
+
+Route::get('/customers/export', [AdminController::class, 'exportCustomersReport'])->name('customers.export');
+
 });
 
 // ============================================================================

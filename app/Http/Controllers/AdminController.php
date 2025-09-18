@@ -1489,4 +1489,112 @@ public function exportBookings(Request $request)
             abort(403, 'Account suspended');
         }
     }
+
+    /**
+    * Export customers report as PDF
+    */
+    public function exportCustomersReport(Request $request)
+    {
+        $this->ensureAdminAccess();
+
+        // Get the current admin user
+        $admin = Auth::user();
+
+        // Build query based on filters
+        $query = User::where('is_admin', 0)
+                 ->withCount(['bookings', 'bookings as active_bookings_count' => function ($query) {
+                     $query->whereIn('status', ['confirmed', 'active']);
+                 }, 'bookings as completed_bookings_count' => function ($query) {
+                     $query->where('status', 'completed');
+                 }])
+                 ->with(['bookings' => function ($query) {
+                     $query->latest()->limit(1);
+                 }]);
+
+        // Apply filters
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%");
+            });
+        }
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        // Apply sorting
+        switch ($request->get('sort', 'newest')) {
+            case 'oldest':
+                $query->oldest();
+                    break;
+            case 'name':
+                $query->orderBy('name');
+                break;
+            case 'email':
+                $query->orderBy('email');
+                break;
+            default:
+                $query->latest();
+        }
+
+        $customers = $query->get();
+
+        // Add additional data for each customer
+        $customers = $customers->map(function ($customer) {
+            // Calculate total spent
+            $customer->total_spent = $customer->bookings()
+                                                ->where('payment_status', 'paid')
+                                                ->sum('total_amount');
+
+            // Calculate average booking value
+            $completedBookings = $customer->bookings()->where('status', 'completed')->count();
+            $customer->average_booking_value = $completedBookings > 0 
+                ? $customer->total_spent / $completedBookings 
+                : 0;
+
+            // Get last booking date
+            $lastBooking = $customer->bookings()->latest()->first();
+            $customer->last_booking_date = $lastBooking ? $lastBooking->created_at : null;
+
+            return $customer;
+        });
+
+        // Calculate statistics
+        $stats = [
+            'totalCustomers' => $customers->count(),
+            'activeCustomers' => $customers->where('status', 'active')->count(),
+            'suspendedCustomers' => $customers->where('status', 'suspended')->count(),
+            'recentCustomers' => $customers->where('created_at', '>=', now()->subMonth())->count(),
+            'totalRevenue' => $customers->sum('total_spent'),
+        ];
+
+        // Group customers by status
+        $groupedCustomers = $customers->groupBy(function ($customer) {
+            return ucfirst($customer->status ?? 'Active');
+        });
+
+        // Generate report data
+        $reportData = [
+            'reportTitle' => 'Customer Management Report',
+            'generatedAt' => now(),
+            'admin' => $admin,
+            'customers' => $customers,
+            'groupedCustomers' => $groupedCustomers,
+            'stats' => $stats,
+            'reportPeriod' => $request->filled('search') || $request->filled('status') 
+                ? 'Filtered Results' 
+                : 'All Time',
+        ];
+
+        // Generate PDF
+        $pdf = Pdf::loadView('reports.customer-report', $reportData);
+        $pdf->setPaper('A4', 'portrait');
+    
+        $filename = 'customers-report-' . now()->format('Y-m-d-H-i-s') . '.pdf';
+    
+        return $pdf->download($filename);
+    }
+
 }
