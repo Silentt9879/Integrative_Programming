@@ -206,7 +206,7 @@ Route::get('/debug-observers', function () {
         $testUser->phone = null;
         $testUser->date_of_birth = null;
         $testUser->address = null;
-        
+
         // Create test event
         $userEvent = new UserRegisteredEvent($testUser, ['source' => 'debug_test']);
         $userSubject->notify($userEvent);
@@ -266,7 +266,7 @@ Route::group(['prefix' => 'observer'], function () {
         // Debug routes for Observer Pattern (development/testing)
         Route::get('/observer/booking-info', [ObserverAdminController::class, 'getObserverInfo'])->name('observer.booking.debug');
         Route::get('/observer/report-info', [ObserverReportsController::class, 'getObserverInfo'])->name('observer.report.debug');
-        
+
         // ADDED - Additional debug routes for comprehensive testing
         Route::get('/observer/user-info', function () {
             $userSubject = new \App\Http\Controllers\Observer\Subjects\UserSubject();
@@ -353,7 +353,7 @@ Route::prefix('admin')->name('admin.')->middleware(\App\Http\Middleware\AdminMid
 Route::patch('/bookings/{booking}/return', [AdminController::class, 'returnVehicle'])->name('bookings.return');
 
     // Booking Export Route
-    Route::get('/bookings/export', [BookingController::class, 'export'])->name('bookings.export');
+Route::get('/bookings/export', [AdminController::class, 'exportBookings'])->name('bookings.export');
 });
 
 // ============================================================================

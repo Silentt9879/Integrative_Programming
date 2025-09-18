@@ -17,6 +17,7 @@ use App\Http\Controllers\ReportsController;
 use App\Factory\VehicleFactoryRegistry; // Factory Method Pattern - Tan Xing Ye
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class AdminController extends Controller
 {
@@ -1420,6 +1421,56 @@ class AdminController extends Controller
             'recentBookings' => $recentBookings
         ];
     }
+
+    /**
+ * Export bookings to PDF
+ */
+public function exportBookings(Request $request)
+{
+    $this->ensureAdminAccess();
+
+    try {
+        // Build query with filters
+        $query = Booking::with(['user', 'vehicle']);
+
+        // Apply same filters as in bookings() method
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->whereHas('user', function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%");
+            });
+        }
+
+        $bookings = $query->orderBy('created_at', 'desc')->get();
+
+        // Calculate statistics
+        $totalBookings = $bookings->count();
+        $pendingCount = $bookings->where('status', 'pending')->count();
+        $confirmedCount = $bookings->where('status', 'confirmed')->count();
+        $totalRevenue = $bookings->sum('total_amount');
+
+        // Generate PDF
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('admin.reports.bookings-export', [
+            'bookings' => $bookings,
+            'totalBookings' => $totalBookings,
+            'pendingCount' => $pendingCount,
+            'confirmedCount' => $confirmedCount,
+            'totalRevenue' => $totalRevenue,
+            'filters' => $request->all(),
+            'exportDate' => now()->format('F d, Y \a\t H:i:s')
+        ])->setPaper('a4', 'portrait');
+
+        return $pdf->download('bookings_export_' . now()->format('Y-m-d_H-i-s') . '.pdf');
+
+    } catch (\Exception $e) {
+        return redirect()->back()->with('error', 'Error generating PDF: ' . $e->getMessage());
+    }
+}
 
     private function ensureAdminAccess()
     {
