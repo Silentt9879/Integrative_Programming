@@ -415,7 +415,7 @@
 
                                 <div class="text-center mt-3">
                                     <a href="{{ route('admin.customers') }}" class="btn btn-outline-primary">
-                                        <i class="fas fa-eye me-1"></i>View All Users
+                                        <i class="fas fa-eye me-1"></i>View All Customers
                                     </a>
                                 </div>
                             </div>
