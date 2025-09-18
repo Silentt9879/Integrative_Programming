@@ -233,6 +233,25 @@ Route::middleware(\App\Http\Middleware\UserOnly::class)->group(function () {
     });
 });
 
+// Debug route for booking cancellation testing
+Route::get('/debug-booking/{id}', function($id) {
+    $booking = App\Models\Booking::findOrFail($id);
+    $state = $booking->getState();
+
+    return response()->json([
+        'booking_number' => $booking->booking_number,
+        'current_status' => $booking->status,
+        'payment_status' => $booking->payment_status,
+        'state_class' => get_class($state),
+        'available_actions' => $state->getAvailableActions(),
+        'can_cancel' => in_array('cancel', $state->getAvailableActions()),
+        'pickup_time' => $booking->pickup_datetime->format('Y-m-d H:i:s'),
+        'current_time' => now()->format('Y-m-d H:i:s'),
+        'hours_until_pickup' => $booking->pickup_datetime->diffInHours(now()),
+        'time_check_passes_24h' => $booking->pickup_datetime->diffInHours(now()) > 24
+    ]);
+})->middleware('auth');
+
 // Test Export Route
 Route::get('/admin/bookings/export', [BookingController::class, 'exportPDF'])->name('admin.bookings.export.test');
 
@@ -244,7 +263,8 @@ Route::prefix('admin')->name('admin.')->middleware(\App\Http\Middleware\AdminMid
     Route::get('/bookings', [AdminController::class, 'bookings'])->name('bookings');
     Route::get('/bookings/{booking}', [AdminController::class, 'showBooking'])->name('bookings.show');
     Route::patch('/bookings/{booking}/status', [AdminController::class, 'updateBookingStatus'])->name('bookings.update-status');
-    Route::patch('/bookings/{booking}/return', [AdminController::class, 'returnVehicle'])->name('bookings.return');
+    Route::patch('/bookings/{booking}/pickup', [AdminController::class, 'pickupVehicle'])->name('bookings.pickup');
+Route::patch('/bookings/{booking}/return', [AdminController::class, 'returnVehicle'])->name('bookings.return');
 
     // Booking Export Route
     Route::get('/bookings/export', [BookingController::class, 'export'])->name('bookings.export');

@@ -8,16 +8,14 @@ use Carbon\Carbon;
 class ActiveState extends BookingState
 {
     public function getAvailableActions(): array
-    {
-        $actions = ['view'];
+{
+    $actions = ['view'];
 
-        // Can complete if return date has arrived
-        if ($this->booking->return_datetime <= now()) {
-            $actions[] = 'complete';
-        }
+    // Allow completion anytime for demo
+    $actions[] = 'complete';
 
-        return $actions;
-    }
+    return $actions;
+}
 
     public function getStateMessage(): string
     {
@@ -45,39 +43,38 @@ class ActiveState extends BookingState
         return ['completed'];
     }
 
+
     public function complete(array $data = []): bool
-    {
-        if (!$this->canTransitionTo('completed')) {
-            return false;
-        }
-
-        $updateData = [
-            'status' => 'completed',
-            'actual_return_datetime' => $data['actual_return_datetime'] ?? now(),
-        ];
-
-        // Cal late fees if returned late
-        $actualReturn = $data['actual_return_datetime'] ?? now();
-        if ($actualReturn > $this->booking->return_datetime && $this->booking->vehicle->rentalRate) {
-            $hoursLate = $this->booking->return_datetime->diffInHours($actualReturn);
-            $lateFee = $hoursLate * $this->booking->vehicle->rentalRate->late_fee_per_hour;
-            $updateData['late_fees'] = $lateFee;
-        }
-
-        // damage charges
-        if (isset($data['damage_charges'])) {
-            $updateData['damage_charges'] = $data['damage_charges'];
-        }
-
-        // Cal final amount
-        $finalAmount = $this->booking->total_amount +
-                      ($updateData['late_fees'] ?? 0) +
-                      ($updateData['damage_charges'] ?? 0);
-        $updateData['final_amount'] = $finalAmount;
-
-        $this->booking->update($updateData);
-        $this->updateVehicleStatus('available');
-
-        return true;
+{
+    if (!$this->canTransitionTo('completed')) {
+        return false;
     }
+
+    $updateData = [
+        'status' => 'completed',
+        'actual_return_datetime' => $data['actual_return_datetime'] ?? now(),
+    ];
+
+    // Add damage charges if provided
+    if (isset($data['damage_charges']) && $data['damage_charges'] > 0) {
+        $updateData['damage_charges'] = $data['damage_charges'];
+    }
+
+    // Add return notes if provided
+    if (isset($data['return_notes'])) {
+        $updateData['notes'] = $data['return_notes'];
+    }
+
+    // Calculate final amount (simplified for demo)
+    $finalAmount = $this->booking->total_amount + ($updateData['damage_charges'] ?? 0);
+    $updateData['final_amount'] = $finalAmount;
+
+    // Update booking status to completed
+    $this->booking->update($updateData);
+
+    // Make vehicle available again
+    $this->updateVehicleStatus('available');
+
+    return true;
+}
 }

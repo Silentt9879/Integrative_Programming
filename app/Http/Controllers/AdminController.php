@@ -972,37 +972,43 @@ class AdminController extends Controller {
     }
 
     //Get booking state information
-    public function getBookingStateInfo(Booking $booking) {
-        $this->ensureAdminAccess();
+    public function pickupVehicle(Request $request, $bookingId)
+{
+    $booking = Booking::with('vehicle')->findOrFail($bookingId);
 
-        return response()->json([
-            'success' => true,
-            'stateInfo' => [
-                'currentState' => $booking->status,
-                'statusDescription' => $booking->getStatusDescription(),
-                'availableActions' => $booking->getAvailableActions(),
-                'nextState' => $booking->getNextState(),
-                'stateMessage' => $booking->getStateMessage(),
-                'requiresPayment' => $booking->requiresPayment(),
-                'isTerminal' => $booking->isInTerminalState(),
-                'canTransition' => [
-                    'confirmed' => $booking->canTransitionTo('confirmed'),
-                    'active' => $booking->canTransitionTo('active'),
-                    'completed' => $booking->canTransitionTo('completed'),
-                    'cancelled' => $booking->canTransitionTo('cancelled')
-                ]
-            ]
-        ]);
+    // Validate that booking can be activated
+    if (!$booking->canPerformAction('activate')) {
+        return back()->with('error', 'Cannot activate this booking. Current status: ' . $booking->status);
     }
 
+    try {
+        // Activate the booking using state pattern
+        $activated = $booking->activate();
+
+        if (!$activated) {
+            return back()->with('error', 'Unable to activate booking. Please check booking status.');
+        }
+
+        Log::info("Admin confirmed pickup for booking {$booking->id} - vehicle {$booking->vehicle->id}");
+
+        return back()->with('success', 'Vehicle pickup confirmed! Booking is now active.');
+
+    } catch (\Exception $e) {
+        Log::error("Failed to confirm pickup for booking {$booking->id}: " . $e->getMessage());
+        return back()->with('error', 'Failed to confirm vehicle pickup. Please try again.');
+    }
+}
     //Return vehicle - calculate late fees if applicable
-    public function returnVehicle(Request $request, $bookingId)
+  public function returnVehicle(Request $request, $bookingId)
 {
     $booking = Booking::with('vehicle')->findOrFail($bookingId);
 
     // Validate that booking can be completed
     if (!$booking->canPerformAction('complete')) {
-        return back()->with('error', 'Cannot complete this booking. Current status: ' . $booking->status);
+        return response()->json([
+            'success' => false,
+            'message' => 'Cannot complete this booking. Current status: ' . $booking->status
+        ], 400);
     }
 
     $data = $request->validate([
@@ -1017,21 +1023,30 @@ class AdminController extends Controller {
     }
 
     try {
-        // Complete the booking using state pattern (this will set vehicle back to 'available')
+        // Complete the booking using state pattern
         $completed = $booking->complete($data);
 
         if (!$completed) {
-            return back()->with('error', 'Unable to complete booking. Please check booking status.');
+            return response()->json([
+                'success' => false,
+                'message' => 'Unable to complete booking. Please check booking status.'
+            ], 400);
         }
 
         Log::info("Admin completed booking {$booking->id} and returned vehicle {$booking->vehicle->id}");
 
-        return back()->with('success', 'Vehicle returned successfully! Booking completed and vehicle is now available.');
+        return response()->json([
+            'success' => true,
+            'message' => 'Vehicle returned successfully! Booking completed and vehicle is now available.'
+        ]);
 
     } catch (\Exception $e) {
         Log::error("Failed to return vehicle for booking {$booking->id}: " . $e->getMessage());
 
-        return back()->with('error', 'Failed to complete vehicle return. Please try again.');
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to complete vehicle return. Please try again.'
+        ], 500);
     }
 }
 

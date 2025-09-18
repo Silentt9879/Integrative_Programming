@@ -10,28 +10,31 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Carbon\Carbon;
 
-class BookingController extends Controller {
+class BookingController extends Controller
+{
 
     //display booking
-    public function index() {
+    public function index()
+    {
         $user = Auth::user();
 
         $bookings = Booking::with(['vehicle', 'vehicle.rentalRate'])
-                ->forUser($user->id)
-                ->orderBy('created_at', 'desc')
-                ->paginate(10);
+            ->forUser($user->id)
+            ->orderBy('created_at', 'desc')
+            ->paginate(10);
 
         return view('booking.index', compact('bookings'));
     }
 
     //show booking list
-    public function create($vehicleId) {
+    public function create($vehicleId)
+    {
         $vehicle = Vehicle::with('rentalRate')->findOrFail($vehicleId);
 
         // Check if vehicle is available
         if ($vehicle->status !== 'available') {
             return redirect()->route('vehicles.show', $vehicleId)
-                            ->with('error', 'This vehicle is currently not available for booking.');
+                ->with('error', 'This vehicle is currently not available for booking.');
         }
 
         return view('booking.create', compact('vehicle'));
@@ -40,7 +43,8 @@ class BookingController extends Controller {
     /**
      * Store a new booking
      */
-    public function store(Request $request) {
+    public function store(Request $request)
+    {
         $validated = $request->validate([
             'vehicle_id' => 'required|exists:vehicles,id',
             'pickup_date' => 'required|date|after_or_equal:today',
@@ -53,19 +57,51 @@ class BookingController extends Controller {
             'customer_phone' => 'required|string|max:20'
         ]);
 
+        // Combine date and time
+        $pickupDateTime = Carbon::createFromFormat(
+            'Y-m-d H:i',
+            $validated['pickup_date'] . ' ' . $validated['pickup_time']
+        );
+        $returnDateTime = Carbon::createFromFormat(
+            'Y-m-d H:i',
+            $validated['return_date'] . ' ' . $validated['return_time']
+        );
+
+        // Validate pickup time is not in the past
+        if ($pickupDateTime <= now()) {
+            return back()->withErrors(['pickup_time' => 'Pickup time cannot be in the past.'])
+                ->withInput();
+        }
+
+        //Validate minimum 1 hour advance booking
+        if ($pickupDateTime <= now()->addHour()) {
+            return back()->withErrors(['pickup_time' => 'Booking must be made at least 1 hour in advance.'])
+                ->withInput();
+        }
+
+        // Check if pickup time is in the past
+        if ($pickupDateTime <= now()) {
+            return back()->withErrors(['pickup_time' => 'Pickup time cannot be in the past.'])
+                ->withInput();
+        }
+
         $user = Auth::user();
         $vehicle = Vehicle::with('rentalRate')->findOrFail($validated['vehicle_id']);
 
         // Combine date and time
-        $pickupDateTime = Carbon::createFromFormat('Y-m-d H:i',
-                $validated['pickup_date'] . ' ' . $validated['pickup_time']);
-        $returnDateTime = Carbon::createFromFormat('Y-m-d H:i',
-                $validated['return_date'] . ' ' . $validated['return_time']);
+        $pickupDateTime = Carbon::createFromFormat(
+            'Y-m-d H:i',
+            $validated['pickup_date'] . ' ' . $validated['pickup_time']
+        );
+        $returnDateTime = Carbon::createFromFormat(
+            'Y-m-d H:i',
+            $validated['return_date'] . ' ' . $validated['return_time']
+        );
 
         // Check vehicle availability for these dates
         if (!$this->isVehicleAvailable($vehicle->id, $pickupDateTime, $returnDateTime)) {
             return back()->withErrors(['dates' => 'Vehicle is not available for the selected dates.'])
-                            ->withInput();
+                ->withInput();
         }
 
         // Calculate total cost
@@ -94,26 +130,27 @@ class BookingController extends Controller {
 
         // Reserve the vehicle temporarily (set to 'rented' status to prevent double booking)
         $vehicle->update(['status' => 'rented']);
-        
+
         // Clear vehicle cache when status changes
         $this->clearVehicleCache();
-        
+
         // Also clear individual vehicle cache
         Cache::forget("vehicle_{$vehicle->id}");
 
         // Redirect to payment instead of confirmation
         return redirect()->route('payment.form', $booking->id)
-                        ->with('success', 'Booking created! Please complete payment to confirm your reservation.');
+            ->with('success', 'Booking created! Please complete payment to confirm your reservation.');
     }
 
     /**
      * Show booking confirmation page
      */
-    public function confirmation($bookingId) {
+    public function confirmation($bookingId)
+    {
         $booking = Booking::with(['vehicle', 'vehicle.rentalRate'])
-                ->where('id', $bookingId)
-                ->where('user_id', Auth::id())
-                ->firstOrFail();
+            ->where('id', $bookingId)
+            ->where('user_id', Auth::id())
+            ->firstOrFail();
 
         return view('booking.confirmation', compact('booking'));
     }
@@ -121,11 +158,12 @@ class BookingController extends Controller {
     /**
      * Show specific booking details
      */
-    public function show($bookingId) {
+    public function show($bookingId)
+    {
         $booking = Booking::with(['vehicle', 'vehicle.rentalRate'])
-                ->where('id', $bookingId)
-                ->where('user_id', Auth::id())
-                ->firstOrFail();
+            ->where('id', $bookingId)
+            ->where('user_id', Auth::id())
+            ->firstOrFail();
 
         // Get available actions using State Pattern
         $availableActions = $booking->getAvailableActions();
@@ -137,10 +175,11 @@ class BookingController extends Controller {
     /**
      * Cancel a booking - UPDATED to use State Pattern
      */
-    public function cancel($bookingId) {
+    public function cancel($bookingId)
+    {
         $booking = Booking::where('id', $bookingId)
-                ->where('user_id', Auth::id())
-                ->firstOrFail();
+            ->where('user_id', Auth::id())
+            ->firstOrFail();
 
         // Use State Pattern to check if cancellation is allowed
         if (!$booking->canPerformAction('cancel')) {
@@ -158,22 +197,23 @@ class BookingController extends Controller {
         $this->clearVehicleCache();
 
         return redirect()->route('booking.index')
-                        ->with('success', 'Booking cancelled successfully.');
+            ->with('success', 'Booking cancelled successfully.');
     }
 
     /**
      * Confirm booking - UPDATED to use State Pattern
      */
-    public function confirm($bookingId) {
+    public function confirm($bookingId)
+    {
         $booking = Booking::where('id', $bookingId)
-                ->where('user_id', Auth::id())
-                ->firstOrFail();
+            ->where('user_id', Auth::id())
+            ->firstOrFail();
 
         // Check if confirmation action is available
         if (!$booking->canPerformAction('confirm')) {
             if ($booking->requiresPayment()) {
                 return redirect()->route('payment.form', $booking->id)
-                                ->with('info', 'Please complete payment to confirm your booking.');
+                    ->with('info', 'Please complete payment to confirm your booking.');
             }
             return back()->with('error', 'This booking cannot be confirmed in its current state.');
         }
@@ -186,16 +226,17 @@ class BookingController extends Controller {
         }
 
         return redirect()->route('booking.show', $booking->id)
-                        ->with('success', 'Booking confirmed successfully!');
+            ->with('success', 'Booking confirmed successfully!');
     }
 
     /**
      * Activate booking (mark as picked up) - NEW METHOD using State Pattern
      */
-    public function activate($bookingId) {
+    public function activate($bookingId)
+    {
         $booking = Booking::where('id', $bookingId)
-                ->where('user_id', Auth::id())
-                ->firstOrFail();
+            ->where('user_id', Auth::id())
+            ->firstOrFail();
 
         // Check if activation is allowed
         if (!$booking->canPerformAction('activate')) {
@@ -210,16 +251,17 @@ class BookingController extends Controller {
         }
 
         return redirect()->route('booking.show', $booking->id)
-                        ->with('success', 'Vehicle pickup confirmed. Rental is now active!');
+            ->with('success', 'Vehicle pickup confirmed. Rental is now active!');
     }
 
     /**
      * Complete booking (mark as returned) - NEW METHOD using State Pattern
      */
-    public function complete(Request $request, $bookingId) {
+    public function complete(Request $request, $bookingId)
+    {
         $booking = Booking::where('id', $bookingId)
-                ->where('user_id', Auth::id())
-                ->firstOrFail();
+            ->where('user_id', Auth::id())
+            ->firstOrFail();
 
         // Check if completion is allowed
         if (!$booking->canPerformAction('complete')) {
@@ -242,13 +284,14 @@ class BookingController extends Controller {
         $this->clearVehicleCache();
 
         return redirect()->route('booking.show', $booking->id)
-                        ->with('success', 'Booking completed successfully!');
+            ->with('success', 'Booking completed successfully!');
     }
 
     /**
      * Check vehicle availability
      */
-    public function checkAvailability(Request $request) {
+    public function checkAvailability(Request $request)
+    {
         $request->validate([
             'vehicle_id' => 'required|exists:vehicles,id',
             'pickup_date' => 'required|date',
@@ -261,15 +304,16 @@ class BookingController extends Controller {
         $isAvailable = $this->isVehicleAvailable($request->vehicle_id, $pickupDate, $returnDate);
 
         return response()->json([
-                    'available' => $isAvailable,
-                    'message' => $isAvailable ? 'Vehicle is available' : 'Vehicle is not available for selected dates'
+            'available' => $isAvailable,
+            'message' => $isAvailable ? 'Vehicle is available' : 'Vehicle is not available for selected dates'
         ]);
     }
 
     /**
      * Vehicle availability search
      */
-    public function search(Request $request) {
+    public function search(Request $request)
+    {
         $validated = $request->validate([
             'pickup_date' => 'required|date|after_or_equal:today',
             'return_date' => 'required|date|after:pickup_date',
@@ -282,7 +326,7 @@ class BookingController extends Controller {
 
         // Get available vehicles
         $query = Vehicle::with('rentalRate')
-                ->where('status', 'available');
+            ->where('status', 'available');
 
         if ($request->filled('vehicle_type')) {
             $query->where('type', $validated['vehicle_type']);
@@ -301,7 +345,8 @@ class BookingController extends Controller {
     /**
      * Show search form
      */
-    public function searchForm() {
+    public function searchForm()
+    {
         return view('booking.search-form');
     }
 
@@ -312,7 +357,7 @@ class BookingController extends Controller {
     {
         // Clear vehicle listing cache when availability changes
         $commonFilters = ['', 'type=Economy', 'type=Luxury', 'type=Sedan', 'type=SUV', 'type=Van', 'type=Truck'];
-        
+
         foreach ($commonFilters as $filter) {
             $filterArray = [];
             if (!empty($filter)) {
@@ -321,10 +366,10 @@ class BookingController extends Controller {
             $key = 'vehicles_' . md5(serialize($filterArray));
             Cache::forget($key);
         }
-        
+
         // Clear the base cache key (no filters)
         Cache::forget('vehicles_' . md5(''));
-        
+
         // Also clear some common search combinations
         $searchCombos = ['search=toyota', 'search=bmw', 'year=2020', 'year=2021', 'year=2022'];
         foreach ($searchCombos as $combo) {
@@ -337,20 +382,21 @@ class BookingController extends Controller {
     /**
      * Private method to check vehicle availability
      */
-    private function isVehicleAvailable($vehicleId, $pickupDate, $returnDate) {
+    private function isVehicleAvailable($vehicleId, $pickupDate, $returnDate)
+    {
         // Check for overlapping bookings
         $overlappingBookings = Booking::where('vehicle_id', $vehicleId)
-                ->whereIn('status', ['confirmed', 'active'])
-                ->whereIn('payment_status', ['paid', 'partial'])
-                ->where(function ($query) use ($pickupDate, $returnDate) {
-                    $query->whereBetween('pickup_datetime', [$pickupDate, $returnDate])
-                            ->orWhereBetween('return_datetime', [$pickupDate, $returnDate])
-                            ->orWhere(function ($subQuery) use ($pickupDate, $returnDate) {
-                                $subQuery->where('pickup_datetime', '<=', $pickupDate)
-                                        ->where('return_datetime', '>=', $returnDate);
-                            });
-                })
-                ->exists();
+            ->whereIn('status', ['confirmed', 'active'])
+            ->whereIn('payment_status', ['paid', 'partial'])
+            ->where(function ($query) use ($pickupDate, $returnDate) {
+                $query->whereBetween('pickup_datetime', [$pickupDate, $returnDate])
+                    ->orWhereBetween('return_datetime', [$pickupDate, $returnDate])
+                    ->orWhere(function ($subQuery) use ($pickupDate, $returnDate) {
+                        $subQuery->where('pickup_datetime', '<=', $pickupDate)
+                            ->where('return_datetime', '>=', $returnDate);
+                    });
+            })
+            ->exists();
 
         return !$overlappingBookings;
     }
