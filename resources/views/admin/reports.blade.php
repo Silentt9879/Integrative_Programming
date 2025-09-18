@@ -264,7 +264,7 @@
             <!-- Quick Stats -->
             <div class="stats-row">
                 <div class="row g-4 justify-content-center">
-                    <div class="col-lg-4 col-md-6">
+                    <div class="col-lg-6 col-md-6">
                         <div class="stat-card">
                             <div class="stat-icon text-primary">
                                 <i class="fas fa-chart-line"></i>
@@ -274,7 +274,7 @@
                             <small class="text-success">+15% vs last month</small>
                         </div>
                     </div>
-                    <div class="col-lg-4 col-md-6">
+                    <div class="col-lg-6 col-md-6">
                         <div class="stat-card">
                             <div class="stat-icon text-success">
                                 <i class="fas fa-car-alt"></i>
@@ -282,16 +282,6 @@
                             <h4 id="totalVehicles">{{ $stats['totalVehicles'] }}</h4>
                             <p class="text-muted mb-0">Total Vehicles</p>
                             <small class="text-info">Available in fleet</small>
-                        </div>
-                    </div>
-                    <div class="col-lg-4 col-md-6">
-                        <div class="stat-card">
-                            <div class="stat-icon text-warning">
-                                <i class="fas fa-percentage"></i>
-                            </div>
-                            <h4 id="utilizationRate">{{ $stats['utilizationRate'] }}%</h4>
-                            <p class="text-muted mb-0">Fleet Utilization</p>
-                            <small class="text-success">Above average</small>
                         </div>
                     </div>
                 </div>
@@ -323,6 +313,9 @@
                         <div class="d-flex gap-2">
                             <button type="button" class="btn btn-primary" onclick="updateReports()">
                                 <i class="fas fa-sync me-1"></i>Update Reports
+                            </button>
+                            <button type="button" class="btn export-btn" onclick="exportPDF()">
+                                <i class="fas fa-file-pdf me-1"></i>Export PDF
                             </button>
                         </div>
                     </div>
@@ -685,7 +678,6 @@
     function updateStatistics(stats) {
         document.getElementById('totalRevenue').textContent = 'RM' + parseFloat(stats.totalRevenue).toLocaleString('en-MY', {minimumFractionDigits: 2});
         document.getElementById('totalVehicles').textContent = stats.totalVehicles;
-        document.getElementById('utilizationRate').textContent = stats.utilizationRate + '%';
     }
 
     function updateCharts(newChartData) {
