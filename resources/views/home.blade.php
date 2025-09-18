@@ -43,7 +43,7 @@
                     <!-- Vehicle image from database -->
                     <div class="card-img-top bg-light d-flex align-items-center justify-content-center" style="height: 200px;">
                         @if($vehicle->image_url)
-                        <img src="{{ $vehicle->image_url }}" alt="{{ $vehicle->make }} {{ $vehicle->model }}" 
+                        <img src="{{ $vehicle->image_url }}" alt="{{ $vehicle->make }} {{ $vehicle->model }}"
                              class="img-fluid" style="max-height: 100%; max-width: 100%; object-fit: cover;">
                         @else
                         <i class="fas fa-car text-muted" style="font-size: 4rem;"></i>
@@ -83,9 +83,6 @@
                                 <i class="fas fa-ban me-2"></i>Not Available
                             </button>
                             @endif
-                            <a href="tel:+60123456789" class="btn btn-outline-success">
-                                <i class="fas fa-phone me-2"></i>Call for Inquiry
-                            </a>
                         </div>
                     </div>
                 </div>

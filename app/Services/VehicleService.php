@@ -374,21 +374,16 @@ class VehicleService
         }
     }
 
-    /**
-     * Handle image upload
-     *
-     * @param \Illuminate\Http\UploadedFile $image
-     * @return string
-     */
+    //File Upload Security with Malicious Content Detection -secure coding practices - XY
     private function handleImageUpload($image): string
 {
     try {
-        // MISSING: Advanced security checks
+        //Advanced security checks
         if (!$this->isSecureImage($image)) {
             throw new \Exception('Security validation failed');
         }
 
-        // MISSING: Secure filename generation
+        // Secure filename generation
         $secureName = Str::random(40) . '_' . time() . '.' . $image->getClientOriginalExtension();
 
         $imagePath = $image->storeAs('vehicles', $secureName, 'public');
@@ -399,7 +394,6 @@ class VehicleService
     }
 }
 
-// ADD this new method
 private function isSecureImage($image): bool
 {
     // MIME type validation

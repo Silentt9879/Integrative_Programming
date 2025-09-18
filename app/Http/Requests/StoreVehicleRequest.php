@@ -178,7 +178,7 @@ class StoreVehicleRequest extends FormRequest
     }
 
     /**
-     * Get custom attributes for validator errors -secure coding practices
+     * Get custom attributes for validator errors 
      */
     public function attributes(): array
     {
@@ -195,7 +195,7 @@ class StoreVehicleRequest extends FormRequest
     }
 
     /**
-     * Prepare the data for validation- secure coding practices
+     * Prepare the data for validation
      */
     protected function prepareForValidation(): void
     {
@@ -210,7 +210,7 @@ class StoreVehicleRequest extends FormRequest
     }
 
     /**
-     * Configure the validator instance -secure coding practices
+     * Configure the validator instance
      */
     public function withValidator($validator): void
     {

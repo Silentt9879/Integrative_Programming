@@ -19,7 +19,7 @@
             <div class="card border-0 shadow-sm">
                 <div class="card-body p-0">
                     @if($vehicle->image_url)
-                    <img src="{{ $vehicle->image_url }}" alt="{{ $vehicle->make }} {{ $vehicle->model }}" 
+                    <img src="{{ $vehicle->image_url }}" alt="{{ $vehicle->make }} {{ $vehicle->model }}"
                          class="img-fluid rounded w-100" style="height: 400px; object-fit: cover;">
                     @else
                     <div class="bg-light d-flex align-items-center justify-content-center rounded" style="height: 400px;">
@@ -178,9 +178,6 @@
                             <i class="fas fa-ban me-2"></i>Vehicle Not Available
                         </button>
                         @endif
-                        <a href="tel:+60123456789" class="btn btn-success btn-lg">
-                            <i class="fas fa-phone me-2"></i>Call Now for Inquiry
-                        </a>
                         <a href="mailto:info@rentwheels.com?subject=Inquiry about {{ $vehicle->make }} {{ $vehicle->model }}&body=Hi, I'm interested in learning more about the {{ $vehicle->make }} {{ $vehicle->model }} ({{ $vehicle->license_plate }}). Please contact me with more information." class="btn btn-outline-primary">
                             <i class="fas fa-envelope me-2"></i>Send Email Inquiry
                         </a>

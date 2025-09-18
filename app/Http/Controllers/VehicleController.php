@@ -75,7 +75,8 @@ class VehicleController extends Controller
     }
 
     // ========================================================================
-    // **ENHANCED STORE WITH SECURITY & ERROR HANDLING - secure coding practices
+    // **ENHANCED STORE WITH SECURITY & ERROR HANDLING
+
     // ========================================================================
     public function store(StoreVehicleRequest $request)
     {
@@ -263,6 +264,7 @@ class VehicleController extends Controller
         }
     }
 
+    //Path Traversal Protection - secure coding practices -XY
     private function handleImageUpdate(Vehicle $vehicle, array &$validated, Request $request)
     {
         if ($request->hasFile('image')) {
@@ -290,6 +292,7 @@ class VehicleController extends Controller
             parse_url($url, PHP_URL_SCHEME) === 'https';
     }
 
+    //Path Traversal Protection - secure coding practices -XY
     private function secureFileDelete(?string $imageUrl): void
     {
         if ($imageUrl && str_starts_with($imageUrl, '/storage/')) {

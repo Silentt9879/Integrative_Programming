@@ -34,7 +34,7 @@
                     <form method="GET" action="{{ route('vehicles.index') }}" class="row g-3">
                         <div class="col-md-2">
                             <label class="form-label">Search</label>
-                            <input type="text" name="search" class="form-control" 
+                            <input type="text" name="search" class="form-control"
                                    value="{{ request('search') }}" placeholder="Make, model, plate...">
                         </div>
                         <div class="col-md-2">
@@ -64,10 +64,10 @@
                             <label class="form-label">Max Daily Rate</label>
                             <select name="max_rate" class="form-select">
                                 <option value="">Any Price</option>
-                                <option value="50" {{ request('max_rate') == '50' ? 'selected' : '' }}>Under $50</option>
-                                <option value="100" {{ request('max_rate') == '100' ? 'selected' : '' }}>Under $100</option>
-                                <option value="150" {{ request('max_rate') == '150' ? 'selected' : '' }}>Under $150</option>
-                                <option value="200" {{ request('max_rate') == '200' ? 'selected' : '' }}>Under $200</option>
+                                <option value="50" {{ request('max_rate') == '50' ? 'selected' : '' }}>Under RM50</option>
+                                <option value="100" {{ request('max_rate') == '100' ? 'selected' : '' }}>Under RM100</option>
+                                <option value="150" {{ request('max_rate') == '150' ? 'selected' : '' }}>Under RM150</option>
+                                <option value="200" {{ request('max_rate') == '200' ? 'selected' : '' }}>Under RM200</option>
                             </select>
                         </div>
                         <div class="col-md-2">
@@ -155,7 +155,7 @@
                             </li>
                             <li><hr class="dropdown-divider"></li>
                             <li>
-                                <button class="dropdown-item text-danger" 
+                                <button class="dropdown-item text-danger"
                                         onclick="confirmDelete('{{ $vehicle->id }}', '{{ $vehicle->make }} {{ $vehicle->model }}')">
                                     <i class="fas fa-trash me-2"></i>Delete
                                 </button>
@@ -169,7 +169,7 @@
                 <!-- Vehicle Image -->
                 <div class="card-img-top bg-light d-flex align-items-center justify-content-center" style="height: 200px;">
                     @if($vehicle->image_url)
-                    <img src="{{ $vehicle->image_url }}" alt="{{ $vehicle->make }} {{ $vehicle->model }}" 
+                    <img src="{{ $vehicle->image_url }}" alt="{{ $vehicle->make }} {{ $vehicle->model }}"
                          class="img-fluid rounded-top" style="max-height: 100%; max-width: 100%; object-fit: cover;">
                     @else
                     <i class="fas fa-car text-muted" style="font-size: 4rem;"></i>
@@ -262,9 +262,6 @@
                                 <i class="fas fa-ban me-2"></i>Not Available
                             </button>
                             @endif
-                            <a href="tel:+60123456789" class="btn btn-outline-success">
-                                <i class="fas fa-phone me-2"></i>Call for Inquiry
-                            </a>
                         </div>
                     </div>
                 </div>
@@ -296,10 +293,10 @@
                                 <div class="d-flex align-items-center">
                                     <div class="me-3">
                                         @if($vehicle->image_url)
-                                        <img src="{{ $vehicle->image_url }}" alt="{{ $vehicle->make }}" 
+                                        <img src="{{ $vehicle->image_url }}" alt="{{ $vehicle->make }}"
                                              class="rounded" style="width: 50px; height: 40px; object-fit: cover;">
                                         @else
-                                        <div class="bg-light rounded d-flex align-items-center justify-content-center" 
+                                        <div class="bg-light rounded d-flex align-items-center justify-content-center"
                                              style="width: 50px; height: 40px;">
                                             <i class="fas fa-car text-muted"></i>
                                         </div>
@@ -340,9 +337,6 @@
                                     </a>
                                     @endauth
                                     @endif
-                                    <a href="tel:+60123456789" class="btn btn-sm btn-outline-success" title="Call for Inquiry">
-                                        <i class="fas fa-phone"></i>
-                                    </a>
                                     @auth
                                     @if(Auth::user()->is_admin)
                                     <a href="{{ route('admin.vehicles.edit', $vehicle->id) }}" class="btn btn-sm btn-outline-warning" title="Edit Vehicle">
