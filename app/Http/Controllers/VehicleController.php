@@ -25,14 +25,10 @@ class VehicleController extends Controller
         // Create cache key based on request parameters
         $cacheKey = 'vehicles_' . md5(serialize($request->all()));
 
-        $vehicles = Cache::remember($cacheKey, 300, function () use ($request) { // Reduced to 5 minutes
-            $query = Vehicle::with('rentalRate'); // Show ALL vehicles, not just available ones
-
-            // Enhanced filtering with better query optimization
-            $this->applyFilters($query, $request);
-
-            return $query->orderBy('created_at', 'desc')->paginate(12);
-        });
+        // Disabled cache for immediate updates during presentation
+        $query = Vehicle::with('rentalRate');
+        $this->applyFilters($query, $request);
+        $vehicles = $query->orderBy('created_at', 'desc')->paginate(12);
 
         // Log search patterns for analytics (non-sensitive data only)
         if ($request->filled('search')) {
@@ -47,19 +43,18 @@ class VehicleController extends Controller
     }
 
     // ========================================================================
-// **SHOW INDIVIDUAL VEHICLE WITH CACHING**
-// ========================================================================
+    // **SHOW INDIVIDUAL VEHICLE WITH CACHING**
+    // ========================================================================
     public function show($id)
     {
         try {
             // Cache individual vehicle for 15 minutes
             $cacheKey = "vehicle_{$id}";
 
-            $vehicle = Cache::remember($cacheKey, 900, function () use ($id) {
-                return Vehicle::with('rentalRate')->findOrFail($id);
-            });
+            // immediate status updates
+            $vehicle = Vehicle::with('rentalRate')->findOrFail($id);
 
-            // Log vehicle view for analytics (optional)
+            // Log vehicle view for analytics
             Log::info('Vehicle viewed', [
                 'vehicle_id' => $vehicle->id,
                 'license_plate' => $vehicle->license_plate,
@@ -68,7 +63,6 @@ class VehicleController extends Controller
             ]);
 
             return view('vehicles.show', compact('vehicle'));
-
         } catch (\Exception $e) {
             Log::error('Error displaying vehicle', [
                 'vehicle_id' => $id,
@@ -139,7 +133,6 @@ class VehicleController extends Controller
 
             return redirect()->route('admin.vehicles')
                 ->with('success', 'Vehicle updated successfully using Factory Method Pattern!');
-
         } catch (\InvalidArgumentException $e) {
             Log::warning('Invalid vehicle type attempted', [
                 'type' => $validated['type'] ?? 'unknown',
@@ -149,7 +142,6 @@ class VehicleController extends Controller
             return redirect()->back()
                 ->withErrors(['type' => 'Unsupported vehicle type: ' . ($validated['type'] ?? 'unknown')])
                 ->withInput();
-
         } catch (\Exception $e) {
             Log::error('Vehicle update failed', [
                 'vehicle_id' => $id,
@@ -197,7 +189,6 @@ class VehicleController extends Controller
 
             return redirect()->route('admin.vehicles')
                 ->with('success', 'Vehicle deleted successfully!');
-
         } catch (\Exception $e) {
             Log::error('Vehicle deletion failed', [
                 'vehicle_id' => $id,
@@ -234,7 +225,6 @@ class VehicleController extends Controller
 
             return redirect()->route('admin.vehicles')
                 ->with('success', 'Vehicle added successfully using Factory Method Pattern!');
-
         } catch (\InvalidArgumentException $e) {
             return redirect()->back()
                 ->withErrors(['type' => 'Unsupported vehicle type: ' . ($validated['type'] ?? 'unknown')])
@@ -264,7 +254,6 @@ class VehicleController extends Controller
 
             $imagePath = $file->store('vehicles', 'public');
             $validated['image_url'] = '/storage/' . $imagePath;
-
         } elseif ($request->filled('image_url')) {
             // Validate external URLs
             if (!$this->isValidImageUrl($request->image_url)) {
@@ -282,7 +271,6 @@ class VehicleController extends Controller
 
             // Upload new image
             $this->handleImageUpload($validated, $request);
-
         } elseif ($request->filled('image_url')) {
             $validated['image_url'] = $request->image_url;
         }
@@ -351,11 +339,18 @@ class VehicleController extends Controller
     {
         // Clear vehicle listing cache when availability changes
         $commonFilters = [
-            '', 
-            'type=Economy', 'type=Luxury', 'type=Sedan', 'type=SUV', 'type=Van', 'type=Truck',
-            'status=available', 'status=rented', 'status=maintenance'
+            '',
+            'type=Economy',
+            'type=Luxury',
+            'type=Sedan',
+            'type=SUV',
+            'type=Van',
+            'type=Truck',
+            'status=available',
+            'status=rented',
+            'status=maintenance'
         ];
-        
+
         foreach ($commonFilters as $filter) {
             $filterArray = [];
             if (!empty($filter)) {
@@ -364,15 +359,21 @@ class VehicleController extends Controller
             $key = 'vehicles_' . md5(serialize($filterArray));
             Cache::forget($key);
         }
-        
+
         // Clear the base cache key (no filters)
         Cache::forget('vehicles_' . md5(''));
-        
+
         // Also clear some common search combinations
         $searchCombos = [
-            'search=toyota', 'search=bmw', 'search=perodua',
-            'year=2020', 'year=2021', 'year=2022', 'year=2025',
-            'status=available&type=Economy', 'status=rented&type=Luxury'
+            'search=toyota',
+            'search=bmw',
+            'search=perodua',
+            'year=2020',
+            'year=2021',
+            'year=2022',
+            'year=2025',
+            'status=available&type=Economy',
+            'status=rented&type=Luxury'
         ];
         foreach ($searchCombos as $combo) {
             parse_str($combo, $comboArray);
@@ -403,7 +404,6 @@ class VehicleController extends Controller
                 'defaults' => $defaults,
                 'message' => "Defaults for {$type} retrieved successfully"
             ]);
-
         } catch (\Exception $e) {
             Log::error('Failed to get type defaults', [
                 'type' => $type,

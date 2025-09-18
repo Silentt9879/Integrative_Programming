@@ -20,7 +20,7 @@
                 <!-- Vehicle Image -->
                 <div class="card-img-top bg-light d-flex align-items-center justify-content-center" style="height: 200px;">
                     @if($vehicle->image_url)
-                    <img src="{{ $vehicle->image_url }}" alt="{{ $vehicle->make }} {{ $vehicle->model }}" 
+                    <img src="{{ $vehicle->image_url }}" alt="{{ $vehicle->make }} {{ $vehicle->model }}"
                          class="img-fluid rounded-top" style="max-height: 100%; max-width: 100%; object-fit: cover;">
                     @else
                     <i class="fas fa-car text-muted" style="font-size: 4rem;"></i>
@@ -29,7 +29,7 @@
 
                 <div class="card-body">
                     <h5 class="fw-bold">{{ $vehicle->make }} {{ $vehicle->model }}</h5>
-                    
+
                     <!-- Vehicle Details -->
                     <div class="row g-2 text-sm mb-3">
                         <div class="col-6">
@@ -115,10 +115,10 @@
                             </div>
                             <div class="col-md-6 mt-3">
                                 <label class="form-label">Phone Number <span class="text-danger">*</span></label>
-                                <input type="tel" 
-                                       name="customer_phone" 
-                                       class="form-control @error('customer_phone') is-invalid @enderror" 
-                                       value="{{ old('customer_phone', auth()->user()->phone) }}" 
+                                <input type="tel"
+                                       name="customer_phone"
+                                       class="form-control @error('customer_phone') is-invalid @enderror"
+                                       value="{{ old('customer_phone', auth()->user()->phone) }}"
                                        placeholder="+60 12-345 6789"
                                        required>
                                 @error('customer_phone')
@@ -134,9 +134,9 @@
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Pickup Date <span class="text-danger">*</span></label>
-                                <input type="date" 
-                                       name="pickup_date" 
-                                       class="form-control @error('pickup_date') is-invalid @enderror" 
+                                <input type="date"
+                                       name="pickup_date"
+                                       class="form-control @error('pickup_date') is-invalid @enderror"
                                        value="{{ old('pickup_date', request('pickup_date', date('Y-m-d'))) }}"
                                        min="{{ date('Y-m-d') }}"
                                        required>
@@ -163,9 +163,9 @@
                             </div>
                             <div class="col-md-6 mt-3">
                                 <label class="form-label">Return Date <span class="text-danger">*</span></label>
-                                <input type="date" 
-                                       name="return_date" 
-                                       class="form-control @error('return_date') is-invalid @enderror" 
+                                <input type="date"
+                                       name="return_date"
+                                       class="form-control @error('return_date') is-invalid @enderror"
                                        value="{{ old('return_date', request('return_date', date('Y-m-d', strtotime('+1 day')))) }}"
                                        min="{{ date('Y-m-d', strtotime('+1 day')) }}"
                                        required>
@@ -229,9 +229,9 @@
                         <div class="row mb-4">
                             <div class="col-12">
                                 <label class="form-label">Special Requests (Optional)</label>
-                                <textarea name="special_requests" 
-                                          class="form-control @error('special_requests') is-invalid @enderror" 
-                                          rows="3" 
+                                <textarea name="special_requests"
+                                          class="form-control @error('special_requests') is-invalid @enderror"
+                                          rows="3"
                                           placeholder="Any special requirements or requests...">{{ old('special_requests') }}</textarea>
                                 @error('special_requests')
                                 <div class="invalid-feedback">{{ $message }}</div>
@@ -245,7 +245,7 @@
                                 <div class="form-check">
                                     <input type="checkbox" class="form-check-input" id="terms" required>
                                     <label class="form-check-label" for="terms">
-                                        I agree to the <a href="#" data-bs-toggle="modal" data-bs-target="#termsModal">Terms and Conditions</a> 
+                                        I agree to the <a href="#" data-bs-toggle="modal" data-bs-target="#termsModal">Terms and Conditions</a>
                                         and <a href="#" data-bs-toggle="modal" data-bs-target="#policyModal">Rental Policy</a>
                                     </label>
                                 </div>
@@ -298,16 +298,16 @@
         const pickupDate = document.querySelector('input[name="pickup_date"]').value;
         const returnDate = document.querySelector('input[name="return_date"]').value;
         const dailyRate = {{ $vehicle->rentalRate->daily_rate }};
-        
+
         if (pickupDate && returnDate) {
             const pickup = new Date(pickupDate);
             const returnD = new Date(returnDate);
             const days = Math.ceil((returnD - pickup) / (1000 * 60 * 60 * 24));
-            
+
             if (days > 0) {
                 const totalCost = days * dailyRate;
                 const depositAmount = totalCost * 0.3;
-                
+
                 document.getElementById('duration').textContent = days + ' ' + (days === 1 ? 'day' : 'days');
                 document.getElementById('totalCost').textContent = 'RM' + totalCost.toFixed(2);
                 document.getElementById('depositAmount').textContent = 'RM' + depositAmount.toFixed(2);
@@ -327,18 +327,52 @@
     document.querySelector('input[name="pickup_date"]').addEventListener('change', updatePricing);
     document.querySelector('input[name="return_date"]').addEventListener('change', updatePricing);
 
-    document.querySelector('input[name="pickup_date"]').addEventListener('change', function() {
-        const pickupDate = new Date(this.value);
-        const returnDate = new Date(pickupDate);
-        returnDate.setDate(returnDate.getDate() + 1);
-        
-        const returnInput = document.querySelector('input[name="return_date"]');
-        returnInput.min = returnDate.toISOString().split('T')[0];
-        
-        if (new Date(returnInput.value) <= pickupDate) {
-            returnInput.value = returnDate.toISOString().split('T')[0];
+    // Function to validate pickup time
+function validatePickupTime() {
+    const pickupDate = document.querySelector('input[name="pickup_date"]').value;
+    const pickupTime = document.querySelector('select[name="pickup_time"]').value;
+
+    if (pickupDate && pickupTime) {
+        const now = new Date();
+        const selectedDateTime = new Date(pickupDate + ' ' + pickupTime);
+
+        // If pickup date is today, check if time has passed
+        if (pickupDate === now.toISOString().split('T')[0]) {
+            if (selectedDateTime <= now) {
+                alert('Cannot select a pickup time that has already passed!');
+                document.querySelector('select[name="pickup_time"]').value = '';
+                return false;
+            }
         }
-    });
+    }
+    return true;
+}
+
+document.querySelector('input[name="pickup_date"]').addEventListener('change', function() {
+    const pickupDate = new Date(this.value);
+    const returnDate = new Date(pickupDate);
+    returnDate.setDate(returnDate.getDate() + 1);
+
+    const returnInput = document.querySelector('input[name="return_date"]');
+    returnInput.min = returnDate.toISOString().split('T')[0];
+
+    if (new Date(returnInput.value) <= pickupDate) {
+        returnInput.value = returnDate.toISOString().split('T')[0];
+    }
+
+    // Clear pickup time if date changes to trigger revalidation
+    document.querySelector('select[name="pickup_time"]').value = '';
+});
+
+// Add time validation when pickup time changes
+document.querySelector('select[name="pickup_time"]').addEventListener('change', validatePickupTime);
+
+// Validate on form submit
+document.getElementById('bookingForm').addEventListener('submit', function(e) {
+    if (!validatePickupTime()) {
+        e.preventDefault();
+    }
+});
 
     updatePricing();
 
