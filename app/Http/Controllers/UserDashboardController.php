@@ -20,6 +20,14 @@ class UserDashboardController extends Controller
             return redirect()->route('admin.dashboard')
                 ->with('error', 'Admin users should use the admin panel.');
         }
+
+        // Check if this is first-time visit after registration
+        $isFirstTime = session('is_first_time_user', false);
+    
+        // Clear the first-time flag after checking
+        if ($isFirstTime) {
+        session()->forget('is_first_time_user');
+        }
         
         // Get user-specific dashboard data
         $stats = [
@@ -28,6 +36,7 @@ class UserDashboardController extends Controller
             'totalBookings' => Booking::where('user_id', $user->id)->count(),
             'availableVehicles' => Vehicle::where('status', 'available')->count(),
             'memberStatus' => $this->getUserMemberStatus($user),
+            'isFirstTime' => $isFirstTime,
         ];
         
         return view('user.dashboard', $stats);

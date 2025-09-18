@@ -380,8 +380,8 @@ Route::prefix('admin')->name('admin.')->middleware(\App\Http\Middleware\AdminMid
         ->middleware('throttle:vehicle-creation')
         ->name('vehicles.store');
 
-    Route::get('/vehicles/{vehicle}', [AdminController::class, 'showVehicle'])->name('vehicles.show');
-    Route::get('/vehicles/{id}/edit', [VehicleController::class, 'edit'])->name('vehicles.edit');
+    Route::get('/vehicles/{id}', [AdminController::class, 'showVehicle'])->name('vehicles.show');
+    Route::get('/vehicles/{vehicle}/edit', [AdminController::class, 'editVehicle'])->name('vehicles.edit');
 
     Route::put('/vehicles/{id}', [VehicleController::class, 'update'])
         ->middleware('throttle:vehicle-updates')

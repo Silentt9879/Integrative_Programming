@@ -9,7 +9,7 @@
         <style>
             body {
                 font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+                background: white;
                 min-height: 100vh;
             }
 
@@ -18,33 +18,93 @@
             }
 
             .welcome-card {
-                background: rgba(255, 255, 255, 0.95);
-                backdrop-filter: blur(20px);
-                border-radius: 24px;
-                box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
-                border: 1px solid rgba(255, 255, 255, 0.2);
+                background: linear-gradient(135deg, #007bff 0%, #0056b3 50%, #004085 100%);
+                border-radius: 20px;
+                box-shadow: 0 8px 32px rgba(0, 123, 255, 0.3);
+                border: none;
                 padding: 2rem;
                 margin-bottom: 2rem;
+                color: white;
+            }
+
+            .welcome-card .lead {
+                color: rgba(255, 255, 255, 0.9) !important;
+            }
+
+            .welcome-card .text-muted {
+                color: rgba(255, 255, 255, 0.8) !important;
+            }
+
+            .welcome-card .text-primary {
+                color: white !important;
+            }
+
+            .welcome-card .btn-primary {
+                background-color: white;
+                border-color: white;
+                color: #007bff;
+            }
+
+            .welcome-card .btn-primary:hover {
+                background-color: #f8f9fa;
+                border-color: #f8f9fa;
+                color: #0056b3;
+            }
+
+            .welcome-card .btn-outline-primary {
+                border-color: white;
+                color: white;
+            }
+
+            .welcome-card .btn-outline-primary:hover {
+                background-color: white;
+                border-color: white;
+                color: #007bff;
+            }
+
+            .welcome-card .text-muted {
+                color: rgba(255, 255, 255, 0.8) !important;
             }
 
             .stats-card {
-                background: rgba(255, 255, 255, 0.9);
-                backdrop-filter: blur(10px);
+                background: white;
                 border-radius: 16px;
                 padding: 1.5rem;
                 text-align: center;
-                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-                border: 1px solid rgba(255, 255, 255, 0.3);
-                transition: transform 0.3s ease;
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+                border: 1px solid #f0f3f8;
+                transition: all 0.3s ease;
+                color: #333;
             }
 
             .stats-card:hover {
-                transform: translateY(-5px);
+                transform: translateY(-2px);
+                box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+            }
+
+            .stats-card .text-muted {
+                color: #6c757d !important;
             }
 
             .stats-icon {
                 font-size: 2.5rem;
                 margin-bottom: 1rem;
+            }
+
+            .stats-card .stats-icon.text-primary {
+                color: #007bff !important;
+            }
+
+            .stats-card .stats-icon.text-success {
+                color: #10b981 !important;
+            }
+
+            .stats-card .stats-icon.text-info {
+                color: #06b6d4 !important;
+            }
+
+            .stats-card .stats-icon.text-warning {
+                color: #f59e0b !important;
             }
 
             .navbar-brand {
@@ -74,6 +134,100 @@
             .status-vip {
                 background: linear-gradient(45deg, #ffc107, #dc3545);
                 color: white;
+            }
+
+            .card {
+                background: #0d6efd;
+                border: none;
+                color: white;
+            }
+
+            .welcome-card .text-primary {
+                color: white !important;
+            }
+
+            .welcome-card .btn-primary {
+                background-color: white;
+                border-color: white;
+                color: #0d6efd;
+            }
+
+            .welcome-card .btn-primary:hover {
+                background-color: #f8f9fa;
+                border-color: #f8f9fa;
+                color: #0d6efd;
+            }
+
+            .welcome-card .btn-outline-primary {
+                border-color: white;
+                color: white;
+            }
+
+            .welcome-card .btn-outline-primary:hover {
+                background-color: white;
+                border-color: white;
+                color: #0d6efd;
+            }
+
+            .card .btn-primary {
+                background-color: white;
+                border-color: white;
+                color: #0d6efd;
+            }
+
+            .card .btn-primary:hover {
+                background-color: #f8f9fa;
+                border-color: #f8f9fa;
+                color: #0d6efd;
+            }
+
+            .card .card-text {
+                color: rgba(255, 255, 255, 0.9);
+            }
+
+            .card .text-primary,
+            .card .text-success {
+                color: white !important;
+            }
+
+            .welcome-card .btn-primary {
+                background-color: white;
+                border-color: white;
+                color: #0d6efd;
+            }
+
+            .welcome-card .btn-primary:hover {
+                background-color: #f8f9fa;
+                border-color: #f8f9fa;
+                color: #0d6efd;
+            }
+
+            .welcome-card .btn-outline-primary {
+                border-color: white;
+                color: white;
+            }
+
+            .welcome-card .btn-outline-primary:hover {
+                background-color: white;
+                border-color: white;
+                color: #0d6efd;
+            }
+
+            .card .btn-primary {
+                background-color: white;
+                border-color: white;
+                color: #0d6efd;
+            }
+
+            .card .btn-primary:hover {
+                background-color: #f8f9fa;
+                border-color: #f8f9fa;
+                color: #0d6efd;
+            }
+
+            .card .text-primary,
+            .card .text-success {
+                color: white !important;
             }
         </style>
     </head>
@@ -152,10 +306,18 @@
                         <div class="col-md-8">
                             <h1 class="h2 mb-3">
                                 <i class="fas fa-tachometer-alt text-primary me-3"></i>
-                                Welcome back, {{ Auth::user()->name }}!
+                                @if($isFirstTime ?? false)
+                                    Welcome, {{ Auth::user()->name }}!
+                                @else
+                                    Welcome back, {{ Auth::user()->name }}!
+                                @endif
                             </h1>
                             <p class="lead text-muted mb-3">
-                                Ready to find your perfect ride? Browse our available vehicles or manage your bookings.
+                                @if($isFirstTime ?? false)
+                                    Thank you for joining RentWheels! Ready to find your perfect ride? Browse our available vehicles or make your first booking.
+                                @else
+                                    Ready to find your perfect ride? Browse our available vehicles or manage your bookings.
+                                @endif
                             </p>
                             <div class="d-flex gap-3">
                                 <a href="{{ route('vehicles.index') }}" class="btn btn-primary btn-lg">

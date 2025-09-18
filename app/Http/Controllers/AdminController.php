@@ -43,10 +43,10 @@ class AdminController extends Controller {
      * Handle admin login submission
      */
     public function login(Request $request) {
-        // Additional check: If user is already logged in
+            // Additional check: If user is already logged in
         if (Auth::check()) {
             $user = Auth::user();
-            if ($user->is_admin) {
+                if ($user->is_admin) {
                 return redirect()->route('admin.dashboard');
             } else {
                 Auth::logout(); // Logout regular user before admin login attempt
@@ -57,7 +57,7 @@ class AdminController extends Controller {
         $validator = Validator::make($request->all(), [
             'email' => 'required|email|max:255',
             'password' => 'required|min:6',
-                ], [
+        ], [
             'email.required' => 'Admin email is required.',
             'email.email' => 'Please enter a valid email address.',
             'password.required' => 'Admin password is required.',
@@ -66,8 +66,8 @@ class AdminController extends Controller {
 
         if ($validator->fails()) {
             return back()
-                            ->withErrors($validator)
-                            ->withInput($request->only('email'));
+                        ->withErrors($validator)
+                        ->withInput($request->only('email'));
         }
 
         // Get credentials
@@ -82,28 +82,28 @@ class AdminController extends Controller {
             if (!$user->is_admin) {
                 Auth::logout();
                 return back()->withErrors([
-                            'email' => 'Access denied. Admin privileges required. This incident has been logged.'
-                        ])->withInput($request->only('email'));
+                        'email' => 'Access denied. This is for administrators only. Regular users should use the main login page.'
+                    ])->withInput($request->only('email'));
             }
 
             // Check if admin account is active
             if ($user->status !== 'active') {
                 Auth::logout();
                 return back()->withErrors([
-                            'email' => 'Your admin account has been suspended.'
-                        ])->withInput($request->only('email'));
+                        'email' => 'Your admin account has been suspended.'
+                    ])->withInput($request->only('email'));
             }
 
             $request->session()->regenerate();
 
             return redirect()->route('admin.dashboard')
-                            ->with('success', 'Welcome back, Admin ' . $user->name . '!');
+                        ->with('success', 'Welcome back, Admin ' . $user->name . '!');
         }
 
         // Authentication failed
         return back()->withErrors([
-                    'email' => 'The provided credentials do not match our admin records.',
-                ])->withInput($request->only('email'));
+                'email' => 'The provided credentials do not match our admin records.',
+            ])->withInput($request->only('email'));
     }
 
     /**

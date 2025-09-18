@@ -1,4 +1,4 @@
-<!-- resources/views/layouts/app.blade.php -->
+<!-- resources/views/layouts/admin.blade.php -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -13,7 +13,7 @@
             background: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), 
                         url('https://images.unsplash.com/photo-1449824913935-59a10b8d2000?ixlib=rb-4.0.3') center/cover;
             height: 400px;
-        color: white;
+            color: white;
         }
         
         .vehicle-card, .content-card {
@@ -31,7 +31,7 @@
         }
         
         .page-header {
-            background: linear-gradient(135deg, #007bff, #0056b3);
+            background: linear-gradient(135deg, #dc3545, #c82333);
             color: white;
             padding: 60px 0;
         }
@@ -58,11 +58,60 @@
         .status-badge {
             font-size: 0.8em;
         }
+
+        /* Custom red theme for navbar */
+        .navbar-red {
+            background: linear-gradient(135deg, #dc3545, #c82333) !important;
+        }
+
+        .admin-nav-item {
+            margin: 0 0.25rem;
+        }
+
+        .admin-nav-item .nav-link {
+            color: rgba(255, 255, 255, 0.9) !important;
+            font-weight: 500;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            transition: all 0.3s ease;
+        }
+
+        .admin-nav-item .nav-link:hover {
+            background-color: rgba(255, 255, 255, 0.15);
+            color: white !important;
+            transform: translateY(-1px);
+        }
+
+        .admin-nav-item .nav-link.active {
+            background-color: rgba(255, 255, 255, 0.2);
+            color: white !important;
+        }
+
+        .logout-form {
+            margin: 0;
+        }
+
+        .logout-btn {
+            background: none !important;
+            border: none !important;
+            color: rgba(255, 255, 255, 0.9) !important;
+            font-weight: 500;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .logout-btn:hover {
+            background-color: rgba(255, 255, 255, 0.15) !important;
+            color: white !important;
+            transform: translateY(-1px);
+        }
     </style>
 </head>
 <body>
     <!-- Admin Navigation Header -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+    <nav class="navbar navbar-expand-lg navbar-dark navbar-red">
         <div class="container">
             <a class="navbar-brand" href="{{ route('app') }}">
                 <i class="fas fa-car me-2"></i>RentWheels
@@ -72,41 +121,37 @@
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ route('app') }}">
-                            <i class="fas fa-home me-1"></i>Home
+                    <li class="nav-item admin-nav-item">
+                        <a class="nav-link {{ request()->routeIs('admin.dashboard') ? 'active' : '' }}" 
+                           href="{{ route('admin.dashboard') }}">
+                            <i class="fas fa-tachometer-alt me-1"></i>Dashboard
                         </a>
                     </li>
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle text-warning" href="#" role="button" data-bs-toggle="dropdown">
-                            <i class="fas fa-shield-alt me-1"></i>Admin Panel
+                    <li class="nav-item admin-nav-item">
+                        <a class="nav-link {{ request()->routeIs('admin.customers*') ? 'active' : '' }}" 
+                           href="{{ route('admin.customers') }}">
+                            <i class="fas fa-users me-1"></i>Customers
                         </a>
-                        <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="{{ route('admin.dashboard') }}">
-                                    <i class="fas fa-tachometer-alt me-2"></i>Dashboard
-                                </a></li>
-                            <li><a class="dropdown-item" href="{{ route('admin.customers') }}">
-                                    <i class="fas fa-users me-2"></i>Customers
-                                </a></li>
-                            <li><a class="dropdown-item" href="{{ route('admin.vehicles') }}">
-                                    <i class="fas fa-car me-2"></i>Vehicles
-                                </a></li>
-                            <li><a class="dropdown-item" href="{{ url('/admin/bookings') }}">
-                                    <i class="fas fa-calendar me-2"></i>Bookings
-                                </a></li>
-                            <li><a class="dropdown-item" href="{{ route('admin.reports') }}">
-                                    <i class="fas fa-chart-bar me-2"></i>Reports
-                                </a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li>
-                                <form method="POST" action="{{ route('admin.logout') }}" class="d-inline">
-                                    @csrf
-                                    <button class="dropdown-item" type="submit">
-                                        <i class="fas fa-sign-out-alt me-2"></i>Logout
-                                    </button>
-                                </form>
-                            </li>
-                        </ul>
+                    </li>
+                    <li class="nav-item admin-nav-item">
+                        <a class="nav-link {{ request()->routeIs('admin.vehicles*') ? 'active' : '' }}" 
+                           href="{{ route('admin.vehicles') }}">
+                            <i class="fas fa-car me-1"></i>Vehicles
+                        </a>
+                    </li>
+                    <li class="nav-item admin-nav-item">
+                        <a class="nav-link {{ request()->routeIs('admin.reports*') ? 'active' : '' }}" 
+                           href="{{ route('admin.reports') }}">
+                            <i class="fas fa-chart-bar me-1"></i>Reports
+                        </a>
+                    </li>
+                    <li class="nav-item admin-nav-item">
+                        <form method="POST" action="{{ route('admin.logout') }}" class="logout-form d-inline">
+                            @csrf
+                            <button class="logout-btn" type="submit">
+                                <i class="fas fa-sign-out-alt me-1"></i>Logout
+                            </button>
+                        </form>
                     </li>
                 </ul>
             </div>
@@ -124,7 +169,6 @@
     @if(session('error'))
         <div class="alert alert-danger alert-dismissible fade show" role="alert">
             <i class="fas fa-exclamation-circle me-2"></i>{{ session('error') }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
     @endif
 

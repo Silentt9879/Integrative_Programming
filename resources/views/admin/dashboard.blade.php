@@ -9,38 +9,38 @@
         <style>
             body {
                 font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                background: linear-gradient(135deg, #dc3545 0%, #6f42c1 50%, #fd7e14 100%);
+                background: #ffffff;
                 min-height: 100vh;
             }
 
             .dashboard-container {
                 padding: 2rem 0;
+                background: #f8f9fa;
             }
 
             .admin-welcome-card {
-                background: rgba(255, 255, 255, 0.95);
-                backdrop-filter: blur(20px);
+                background: #ffffff;
                 border-radius: 24px;
-                box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
-                border: 1px solid rgba(255, 255, 255, 0.2);
+                box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+                border: 3px solid #dee2e6;
                 padding: 2rem;
                 margin-bottom: 2rem;
             }
 
             .admin-stats-card {
-                background: rgba(255, 255, 255, 0.9);
-                backdrop-filter: blur(10px);
+                background: #ffffff;
                 border-radius: 16px;
                 padding: 1.5rem;
                 text-align: center;
-                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-                border: 1px solid rgba(255, 255, 255, 0.3);
+                box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
+                border: 3px solid #dee2e6;
                 transition: transform 0.3s ease, box-shadow 0.3s ease;
             }
 
             .admin-stats-card:hover {
                 transform: translateY(-5px);
                 box-shadow: 0 15px 40px rgba(0, 0, 0, 0.2);
+                border-color: #dc3545;
             }
 
             .stats-icon {
@@ -54,16 +54,17 @@
             }
 
             .admin-card {
-                background: rgba(255, 255, 255, 0.95);
-                backdrop-filter: blur(10px);
+                background: #ffffff;
                 border-radius: 16px;
-                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-                border: 1px solid rgba(255, 255, 255, 0.3);
+                box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
+                border: 3px solid #dee2e6;
                 transition: transform 0.3s ease;
             }
 
             .admin-card:hover {
                 transform: translateY(-3px);
+                box-shadow: 0 12px 35px rgba(0, 0, 0, 0.18);
+                border-color: #dc3545;
             }
 
             .user-avatar {
@@ -134,7 +135,8 @@
             .table-responsive {
                 border-radius: 12px;
                 overflow: hidden;
-                box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+                border: 2px solid #f8f9fa;
             }
 
             .admin-section-title {
@@ -160,54 +162,114 @@
             .trend-stable {
                 color: #6c757d;
             }
+
+            .container {
+                max-width: 1200px;
+            }
+
+            .card-body {
+                padding: 1.5rem;
+            }
+
+            .table {
+                background: #ffffff;
+            }
+
+            .table-light th {
+                background-color: #f8f9fa;
+                border-color: #e9ecef;
+                font-weight: 600;
+            }
+
+            /* Red theme navbar styles */
+            .navbar-red {
+                background: linear-gradient(135deg, #dc3545, #c82333) !important;
+            }
+
+            .admin-nav-item {
+                margin: 0 0.25rem;
+            }
+
+            .admin-nav-item .nav-link {
+                color: rgba(255, 255, 255, 0.9) !important;
+                font-weight: 500;
+                padding: 0.5rem 1rem;
+                border-radius: 6px;
+                transition: all 0.3s ease;
+            }
+
+            .admin-nav-item .nav-link:hover {
+                background-color: rgba(255, 255, 255, 0.15);
+                color: white !important;
+                transform: translateY(-1px);
+            }
+
+            .admin-nav-item .nav-link.active {
+                background-color: rgba(255, 255, 255, 0.2);
+                color: white !important;
+            }
+
+            .logout-form {
+                margin: 0;
+            }
+
+            .logout-btn {
+                background: none !important;
+                border: none !important;
+                color: rgba(255, 255, 255, 0.9) !important;
+                font-weight: 500;
+                padding: 0.5rem 1rem;
+                border-radius: 6px;
+                transition: all 0.3s ease;
+                cursor: pointer;
+            }
+
+            .logout-btn:hover {
+                background-color: rgba(255, 255, 255, 0.15) !important;
+                color: white !important;
+                transform: translateY(-1px);
+            }
         </style>
     </head>
     <body>
-        <!-- Navigation -->
-        <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <!-- Updated Admin Navigation Header -->
+        <nav class="navbar navbar-expand-lg navbar-dark navbar-red">
             <div class="container">
                 <a class="navbar-brand" href="{{ route('app') }}">
                     <i class="fas fa-car me-2"></i>RentWheels
                 </a>
-
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                     <span class="navbar-toggler-icon"></span>
                 </button>
-
                 <div class="collapse navbar-collapse" id="navbarNav">
                     <ul class="navbar-nav ms-auto">
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ route('app') }}">
-                                <i class="fas fa-home me-1"></i>Home
+                        <li class="nav-item admin-nav-item">
+                            <a class="nav-link active" href="{{ route('admin.dashboard') }}">
+                                <i class="fas fa-tachometer-alt me-1"></i>Dashboard
                             </a>
                         </li>
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle text-warning" href="#" role="button" data-bs-toggle="dropdown">
-                                <i class="fas fa-shield-alt me-1"></i>Admin Panel
+                        <li class="nav-item admin-nav-item">
+                            <a class="nav-link" href="{{ route('admin.customers') }}">
+                                <i class="fas fa-users me-1"></i>Customers
                             </a>
-                            <ul class="dropdown-menu">
-                                <li><a class="dropdown-item" href="{{ route('admin.dashboard') }}">
-                                        <i class="fas fa-tachometer-alt me-2"></i>Dashboard
-                                    </a></li>
-                                <li><a class="dropdown-item" href="{{ route('admin.customers') }}">
-                                        <i class="fas fa-users me-2"></i>Customers
-                                    </a></li>
-                                <li><a class="dropdown-item" href="{{ route('admin.vehicles') }}">
-                                        <i class="fas fa-car me-2"></i>Vehicles
-                                    </a></li>
-                                <li><a class="dropdown-item" href="{{ route('admin.reports') }}">
-                                        <i class="fas fa-chart-bar me-2"></i>Reports
-                                    </a></li>
-                                <li><hr class="dropdown-divider"></li>
-                                <li>
-                                    <form method="POST" action="{{ route('admin.logout') }}" class="d-inline">
-                                        @csrf
-                                        <button class="dropdown-item" type="submit">
-                                            <i class="fas fa-sign-out-alt me-2"></i>Logout
-                                        </button>
-                                    </form>
-                                </li>
-                            </ul>
+                        </li>
+                        <li class="nav-item admin-nav-item">
+                            <a class="nav-link" href="{{ route('admin.vehicles') }}">
+                                <i class="fas fa-car me-1"></i>Vehicles
+                            </a>
+                        </li>
+                        <li class="nav-item admin-nav-item">
+                            <a class="nav-link" href="{{ route('admin.reports') }}">
+                                <i class="fas fa-chart-bar me-1"></i>Reports
+                            </a>
+                        </li>
+                        <li class="nav-item admin-nav-item">
+                            <form method="POST" action="{{ route('admin.logout') }}" class="logout-form d-inline">
+                                @csrf
+                                <button class="logout-btn" type="submit">
+                                    <i class="fas fa-sign-out-alt me-1"></i>Logout
+                                </button>
+                            </form>
                         </li>
                     </ul>
                 </div>
@@ -230,7 +292,7 @@
                             </p>
                             <div class="d-flex gap-3 flex-wrap">
                                 <a href="{{ route('admin.customers') }}" class="btn quick-action-btn btn-lg">
-                                    <i class="fas fa-users me-2"></i>Manage Users
+                                    <i class="fas fa-users me-2"></i>Manage Customers
                                 </a>
                                 <a href="{{ route('admin.vehicles') }}" class="btn quick-action-btn btn-lg">
                                     <i class="fas fa-car me-2"></i>Manage Vehicles
@@ -256,7 +318,7 @@
                                 <i class="fas fa-users"></i>
                             </div>
                             <h4>{{ $totalUsers ?? 0 }}</h4>
-                            <p class="text-muted">Total Users</p>
+                            <p class="text-muted">Total Customers</p>
                         </div>
                     </div>
                     <div class="col-md-3">
@@ -290,13 +352,13 @@
 
                 <!-- Recent Activity Section -->
                 <div class="row g-4">
-                    <!-- Recent Users -->
+                    <!-- Recent Customers -->
                     <div class="col-lg-6">
                         <div class="admin-card">
                             <div class="card-body">
                                 <h5 class="admin-section-title">
                                     <i class="fas fa-user-plus text-primary me-2"></i>
-                                    Recent Users
+                                    Recent Customers
                                 </h5>
 
                                 @if(!empty($recentUsers) && $recentUsers->count() > 0)
@@ -304,7 +366,7 @@
                                     <table class="table table-hover">
                                         <thead class="table-light">
                                             <tr>
-                                                <th>User</th>
+                                                <th>Customer</th>
                                                 <th>Email</th>
                                                 <th>Status</th>
                                                 <th>Joined</th>

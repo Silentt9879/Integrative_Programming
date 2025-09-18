@@ -7,38 +7,38 @@
 <style>
     body {
         font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        background: linear-gradient(135deg, #dc3545 0%, #6f42c1 50%, #fd7e14 100%);
+        background: #ffffff;
         min-height: 100vh;
     }
 
     .dashboard-container {
         padding: 2rem 0;
+        background: #f8f9fa;
     }
 
     .admin-welcome-card {
-        background: rgba(255, 255, 255, 0.95);
-        backdrop-filter: blur(20px);
+        background: #ffffff;
         border-radius: 24px;
-        box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
-        border: 1px solid rgba(255, 255, 255, 0.2);
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+        border: 3px solid #dee2e6;
         padding: 2rem;
         margin-bottom: 2rem;
     }
 
     .admin-stats-card {
-        background: rgba(255, 255, 255, 0.9);
-        backdrop-filter: blur(10px);
+        background: #ffffff;
         border-radius: 16px;
         padding: 1.5rem;
         text-align: center;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-        border: 1px solid rgba(255, 255, 255, 0.3);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+        border: 2px solid #e9ecef;
         transition: transform 0.3s ease, box-shadow 0.3s ease;
     }
 
     .admin-stats-card:hover {
         transform: translateY(-5px);
-        box-shadow: 0 15px 40px rgba(0, 0, 0, 0.2);
+        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
+        border-color: #dc3545;
     }
 
     .stats-icon {
@@ -47,17 +47,18 @@
     }
 
     .admin-card {
-        background: rgba(255, 255, 255, 0.95);
-        backdrop-filter: blur(10px);
+        background: #ffffff;
         border-radius: 16px;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-        border: 1px solid rgba(255, 255, 255, 0.3);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
+        border: 3px solid #e9ecef;
         transition: transform 0.3s ease;
         overflow: visible !important;
     }
 
     .admin-card:hover {
         transform: translateY(-3px);
+        border-color: #dc3545;
+        box-shadow: 0 12px 35px rgba(0, 0, 0, 0.18);
     }
 
     .admin-card .card-body {
@@ -66,11 +67,10 @@
     }
 
     .vehicle-card {
-        background: rgba(255, 255, 255, 0.95);
-        backdrop-filter: blur(10px);
+        background: #ffffff;
         border-radius: 16px;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-        border: 1px solid rgba(255, 255, 255, 0.3);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+        border: 3px solid #e9ecef;
         transition: transform 0.3s ease, box-shadow 0.3s ease;
         height: 100%;
     }
@@ -78,6 +78,7 @@
     .vehicle-card:hover {
         transform: translateY(-5px);
         box-shadow: 0 15px 40px rgba(0, 0, 0, 0.2);
+        border-color: #dc3545;
     }
 
     .status-badge {
@@ -123,11 +124,10 @@
     .trend-stable { color: #6c757d; }
 
     .filter-card {
-        background: rgba(255, 255, 255, 0.95);
-        backdrop-filter: blur(10px);
+        background: #ffffff;
         border-radius: 16px;
-        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
-        border: 1px solid rgba(255, 255, 255, 0.3);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+        border: 3px solid #e9ecef;
         margin-bottom: 2rem;
     }
 
@@ -135,14 +135,14 @@
         width: 100%;
         height: 200px;
         object-fit: cover;
-        border-radius: 12px 12px 0 0;
+        border-radius: 13px 13px 0 0;
     }
 
     .vehicle-placeholder {
         width: 100%;
         height: 200px;
         background: linear-gradient(45deg, #f8f9fa, #e9ecef);
-        border-radius: 12px 12px 0 0;
+        border-radius: 13px 13px 0 0;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -174,11 +174,10 @@
     }
 
     .list-view-item {
-        background: rgba(255, 255, 255, 0.95);
-        backdrop-filter: blur(10px);
+        background: #ffffff;
         border-radius: 12px;
-        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-        border: 1px solid rgba(255, 255, 255, 0.3);
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+        border: 2px solid #e9ecef;
         margin-bottom: 1rem;
         transition: transform 0.3s ease;
         position: relative !important;
@@ -189,6 +188,8 @@
     .list-view-item:hover {
         transform: translateY(-2px);
         z-index: 10;
+        border-color: #dc3545;
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.18);
     }
 
     .list-view-item .dropdown {
@@ -204,7 +205,7 @@
         left: auto !important;
         transform: none !important;
         box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25) !important;
-        border: 1px solid rgba(0, 0, 0, 0.1) !important;
+        border: 2px solid rgba(0, 0, 0, 0.1) !important;
         background: white !important;
         border-radius: 8px !important;
         padding: 0.5rem 0 !important;
@@ -241,6 +242,7 @@
         height: 80px;
         object-fit: cover;
         border-radius: 8px;
+        border: 1px solid #e9ecef;
     }
 
     #vehicleListView {
@@ -251,10 +253,25 @@
 
     .container {
         overflow: visible !important;
+        max-width: 1200px;
     }
 
     .dashboard-container {
         overflow: visible !important;
+    }
+
+    .card-body {
+        padding: 1.5rem;
+    }
+
+    .modal-content {
+        border: 2px solid #dee2e6;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    }
+
+    .dropdown-menu {
+        border: 2px solid #e9ecef;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
     }
 </style>
 

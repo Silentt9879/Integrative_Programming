@@ -23,8 +23,8 @@ class AuthController extends Controller
     }
 
     /**
-     * ENHANCED: Handle vehicle booking intent after login
-     */
+ * ENHANCED: Handle vehicle booking intent after login
+ */
     public function login(Request $request)
     {
         // Validate the form data
@@ -47,18 +47,30 @@ class AuthController extends Controller
         if (Auth::attempt($credentials, $remember)) {
             $request->session()->regenerate();
 
-            // Check if user is active
             $user = Auth::user();
-            if ($user->status !== 'active') {
-                Auth::logout();
-                return back()->withErrors([
-                    'email' => 'Your account has been suspended. Please contact support.'
-                ])->withInput($request->only('email'));
-            }
+        
+        // CRITICAL: Check if user is admin - redirect them to admin login
+        if ($user->is_admin) {
+            Auth::logout(); // Logout admin user
+            return back()->withErrors([
+                'email' => 'Admin users must use the Admin Login panel. Please use the Admin link in the navigation.'
+            ])->withInput($request->only('email'));
+        }
 
-            // Default redirect to dashboard
-            return redirect()->intended(route('dashboard'))
-                ->with('success', 'Welcome back, ' . $user->name . '!');
+        // Check if user is active (for regular users only)
+        if ($user->status !== 'active') {
+            Auth::logout();
+            return back()->withErrors([
+                'email' => 'Your account has been suspended. Please contact support.'
+            ])->withInput($request->only('email'));
+        }
+
+        // ENSURE first-time flag is NOT set for returning users
+        session()->forget('is_first_time_user');
+
+        // Default redirect to dashboard (regular users only)
+        return redirect()->intended(route('dashboard'))
+            ->with('success', 'Welcome back, ' . $user->name . '!');
         }
 
         // Authentication failed
@@ -132,6 +144,9 @@ class AuthController extends Controller
 
             // Regenerate session
             $request->session()->regenerate();
+
+            // SET FLAG for first-time registration
+            session(['is_first_time_user' => true]);
 
             // Default redirect to dashboard
             return redirect()

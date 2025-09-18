@@ -6,20 +6,20 @@
 <style>
     body {
         font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        background: linear-gradient(135deg, #dc3545 0%, #6f42c1 50%, #fd7e14 100%);
+        background: #ffffff;
         min-height: 100vh;
     }
 
     .admin-container {
         padding: 2rem 0;
+        background: #f8f9fa;
     }
 
     .admin-card {
-        background: rgba(255, 255, 255, 0.95);
-        backdrop-filter: blur(20px);
+        background: #ffffff;
         border-radius: 20px;
-        box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
-        border: 1px solid rgba(255, 255, 255, 0.2);
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+        border: 3px solid #dee2e6;
         margin-bottom: 2rem;
     }
 
@@ -27,8 +27,8 @@
         background: linear-gradient(135deg, #dc3545, #6f42c1);
         color: white;
         padding: 2rem;
-        border-radius: 20px 20px 0 0;
-        margin: -1px -1px 0 -1px;
+        border-radius: 17px 17px 0 0;
+        margin: -3px -3px 0 -3px;
     }
 
     .stats-row {
@@ -36,6 +36,7 @@
         border-radius: 15px;
         padding: 1.5rem;
         margin-bottom: 2rem;
+        border: 2px solid #e9ecef;
     }
 
     .stat-card {
@@ -43,12 +44,15 @@
         border-radius: 12px;
         padding: 1.5rem;
         text-align: center;
-        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+        border: 2px solid #e9ecef;
         transition: transform 0.3s ease;
     }
 
     .stat-card:hover {
         transform: translateY(-3px);
+        border-color: #dc3545;
+        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
     }
 
     .stat-icon {
@@ -116,13 +120,15 @@
         border-radius: 15px;
         padding: 1.5rem;
         margin-bottom: 2rem;
-        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+        border: 3px solid #e9ecef;
     }
 
     .table-responsive {
         border-radius: 12px;
         overflow: hidden;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
+        border: 2px solid #f8f9fa;
     }
 
     .table thead th {
@@ -135,6 +141,7 @@
 
     .table tbody tr {
         transition: all 0.3s ease;
+        background: #ffffff;
     }
 
     .table tbody tr:hover {
@@ -165,9 +172,23 @@
         color: white;
     }
 
+    .modal-content {
+        border: 2px solid #dee2e6;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    }
+
     .form-control:focus {
         border-color: #dc3545;
         box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
+    }
+
+    .alert {
+        border: 2px solid;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    }
+
+    .container {
+        max-width: 1200px;
     }
 </style>
 

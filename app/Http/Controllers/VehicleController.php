@@ -419,4 +419,12 @@ class VehicleController extends Controller
             ], 500);
         }
     }
+
+    public function edit($id)
+    {
+        $vehicle = Vehicle::findOrFail($id);
+        return view('admin.edit', compact('vehicle'));
+    }
+
+
 }

@@ -7,35 +7,36 @@
 <style>
     body {
         font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        background: linear-gradient(135deg, #dc3545 0%, #6f42c1 50%, #fd7e14 100%);
+        background: #ffffff;
         min-height: 100vh;
     }
 
     .dashboard-container {
         padding: 2rem 0;
+        background: #f8f9fa;
     }
 
     .admin-welcome-card {
-        background: rgba(255, 255, 255, 0.95);
-        backdrop-filter: blur(20px);
+        background: #ffffff;
         border-radius: 24px;
-        box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
-        border: 1px solid rgba(255, 255, 255, 0.2);
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+        border: 3px solid #dee2e6;
         padding: 2rem;
         margin-bottom: 2rem;
     }
 
     .admin-card {
-        background: rgba(255, 255, 255, 0.95);
-        backdrop-filter: blur(10px);
+        background: #ffffff;
         border-radius: 16px;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-        border: 1px solid rgba(255, 255, 255, 0.3);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
+        border: 3px solid #e9ecef;
         transition: transform 0.3s ease;
     }
 
     .admin-card:hover {
         transform: translateY(-3px);
+        border-color: #dc3545;
+        box-shadow: 0 12px 35px rgba(0, 0, 0, 0.18);
     }
 
     .quick-action-btn {
@@ -53,8 +54,9 @@
 
     .form-control, .form-select {
         border-radius: 8px;
-        border: 1px solid rgba(0, 0, 0, 0.1);
+        border: 2px solid #e9ecef;
         transition: all 0.3s ease;
+        background: #ffffff;
     }
 
     .form-control:focus, .form-select:focus {
@@ -74,24 +76,34 @@
     }
 
     .btn-outline-secondary {
-        border-color: rgba(108, 117, 125, 0.3);
+        border-color: #6c757d;
+        border-width: 2px;
         transition: all 0.3s ease;
     }
 
     .btn-outline-secondary:hover {
         transform: translateY(-2px);
         background: rgba(108, 117, 125, 0.1);
+        border-color: #6c757d;
     }
 
     .card {
         border: none;
         border-radius: 16px;
         overflow: hidden;
+        background: #ffffff;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
     }
 
     .card-header {
         background: linear-gradient(135deg, #dc3545, #6f42c1) !important;
         border: none;
+        padding: 1.5rem;
+    }
+
+    .card-body {
+        background: #ffffff;
+        padding: 2rem;
     }
 
     .text-primary {
@@ -100,6 +112,35 @@
 
     .border-bottom {
         border-color: rgba(220, 53, 69, 0.3) !important;
+        border-width: 2px !important;
+    }
+
+    .container {
+        max-width: 1200px;
+    }
+
+    .invalid-feedback {
+        font-weight: 500;
+    }
+
+    .form-text {
+        color: #6c757d;
+        font-size: 0.875rem;
+    }
+
+    .form-label {
+        font-weight: 600;
+        color: #343a40;
+        margin-bottom: 0.75rem;
+    }
+
+    .is-invalid {
+        border-color: #dc3545 !important;
+        border-width: 2px !important;
+    }
+
+    h6 {
+        font-size: 1.1rem;
     }
 </style>
 
