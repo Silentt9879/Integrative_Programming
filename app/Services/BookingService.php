@@ -187,7 +187,7 @@ class BookingService
     /**
      * Get booking with state information
      */
-    public function getBookingWithState(int $bookingId, int $userId = null): Booking
+    public function getBookingWithState(int $bookingId, ?int $userId = null): Booking
     {
         $query = Booking::with(['vehicle', 'vehicle.rentalRate'])
                        ->where('id', $bookingId);
@@ -271,7 +271,7 @@ class BookingService
     /**
      * Get booking statistics using State Pattern
      */
-    public function getBookingStatistics(int $userId = null): array
+    public function getBookingStatistics(?int $userId = null): array
     {
         $query = Booking::query();
 
