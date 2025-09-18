@@ -75,7 +75,7 @@ class VehicleController extends Controller
     }
 
     // ========================================================================
-    // **ENHANCED STORE WITH SECURITY & ERROR HANDLING**
+    // **ENHANCED STORE WITH SECURITY & ERROR HANDLING - secure coding practices
     // ========================================================================
     public function store(StoreVehicleRequest $request)
     {
