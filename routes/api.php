@@ -1,12 +1,18 @@
 <?php
+Route::get('/simple-test', function () {
+    return response()->json(['message' => 'Basic API routing works!']);
+});
+
 // routes/api.php - Vehicle Rental System API Routes
 // BMIT3173 Assignment - Vehicle Module API - Tan Xing Ye
 // BMIT3173 Assignment - Booking Module API - [Your Name] (State Pattern Implementation)
+// BMIT3173 Assignment - Observer Module API - Jayvian Lazarus Jerome (Observer Pattern Implementation)
 
 use App\Http\Controllers\Api\VehicleApiController;
 use App\Http\Controllers\Api\PaymentApiController;
 use App\Http\Controllers\Api\ReportsApiController;
 use App\Http\Controllers\Api\BookingApiController; // NEW: Booking API with State Pattern
+use App\Http\Controllers\Api\ObserverApiController; // NEW: Observer API with Observer Pattern - Jayvian Lazarus Jerome
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -69,6 +75,18 @@ Route::prefix('v1')->group(function () {
         ->name('api.bookings.check-availability');
 
     // ========================================================================
+    // *PUBLIC OBSERVER PATTERN API ENDPOINTS - Jayvian Lazarus Jerome*
+    // ========================================================================
+    // Public observer statistics and health check (no sensitive data)
+    Route::get('/observers/statistics', [ObserverApiController::class, 'statistics'])
+        ->middleware('throttle:30,1') // Rate limit for public use
+        ->name('api.observers.public-statistics');
+
+    Route::get('/observers/health', [ObserverApiController::class, 'healthCheck'])
+        ->middleware('throttle:20,1')
+        ->name('api.observers.health');
+
+    // ========================================================================
     // *ADMIN-ONLY API ENDPOINTS*
     // ========================================================================
     // These endpoints require admin authentication
@@ -110,6 +128,71 @@ Route::prefix('v1')->group(function () {
                     ]
                 ]);
             })->name('index');
+        });
+
+        // ====================================================================
+        // *ADMIN OBSERVER PATTERN API ENDPOINTS - Jayvian Lazarus Jerome*
+        // ====================================================================
+        // Full observer pattern management for administrators only
+
+        Route::prefix('observers')->name('api.observers.')->group(function () {
+            
+            // ================================================================
+            // *CORE OBSERVER MANAGEMENT - Jayvian Lazarus Jerome*
+            // ================================================================
+            
+            // Get all available observers
+            Route::get('/', [ObserverApiController::class, 'index'])
+                ->middleware('throttle:60,1')
+                ->name('index');
+
+            // Get specific observer details
+            Route::get('/{observerName}', [ObserverApiController::class, 'show'])
+                ->middleware('throttle:120,1')
+                ->name('show');
+
+            // Attach observer to subject
+            Route::post('/{observerName}/attach', [ObserverApiController::class, 'attach'])
+                ->middleware('throttle:observer-management')
+                ->name('attach');
+
+            // Detach observer from subject
+            Route::delete('/{observerName}/detach', [ObserverApiController::class, 'detach'])
+                ->middleware('throttle:observer-management')
+                ->name('detach');
+
+            // Bulk attach multiple observers
+            Route::post('/bulk/attach', [ObserverApiController::class, 'bulkAttach'])
+                ->middleware('throttle:observer-bulk-operations')
+                ->name('bulk-attach');
+
+            // ================================================================
+            // *SUBJECT MANAGEMENT - Observer Pattern*
+            // ================================================================
+            
+            // Get all subjects with their observers
+            Route::get('/subjects', [ObserverApiController::class, 'getSubjects'])
+                ->middleware('throttle:60,1')
+                ->name('subjects.index');
+
+            // Get specific subject information
+            Route::get('/subjects/{subjectName}', [ObserverApiController::class, 'getSubject'])
+                ->middleware('throttle:120,1')
+                ->name('subjects.show');
+
+            // ================================================================
+            // *EVENT MANAGEMENT & TESTING - Observer Pattern*
+            // ================================================================
+            
+            // Manually trigger events for testing
+            Route::post('/events/trigger', [ObserverApiController::class, 'triggerEvent'])
+                ->middleware('throttle:observer-event-trigger')
+                ->name('events.trigger');
+
+            // Get event history with pagination
+            Route::get('/events', [ObserverApiController::class, 'getEvents'])
+                ->middleware('throttle:observer-events-access')
+                ->name('events.index');
         });
     });
 });
@@ -206,6 +289,80 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     // ========================================================================
+    // *OBSERVER MODULE API ROUTES - Observer Pattern Implementation* - Jayvian Lazarus Jerome
+    // ========================================================================
+    Route::prefix('v1/observers')->name('api.user.observers.')->group(function () {
+
+        // ====================================================================
+        // *USER-LEVEL OBSERVER PATTERN ACCESS - Jayvian Lazarus Jerome*
+        // ====================================================================
+        // Limited observer pattern access for authenticated users (read-only)
+
+        // Get observer system status (user-friendly version)
+        Route::get('/status', function () {
+            try {
+                $observerService = app(\App\Services\ObserverService::class);
+                $subjects = $observerService->getAllSubjects();
+                
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Observer system status retrieved successfully',
+                    'data' => [
+                        'system_active' => true,
+                        'total_subjects' => count($subjects),
+                        'active_subjects' => count(array_filter($subjects, fn($s) => $s['observer_count'] > 0)),
+                        'last_check' => now()->toISOString()
+                    ],
+                    'meta' => [
+                        'timestamp' => now()->toISOString(),
+                        'version' => 'v1',
+                        'pattern' => 'Observer Pattern API'
+                    ]
+                ]);
+            } catch (\Exception $e) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to retrieve observer system status',
+                    'meta' => [
+                        'timestamp' => now()->toISOString(),
+                        'version' => 'v1'
+                    ]
+                ], 500);
+            }
+        })
+        ->middleware('throttle:30,1')
+        ->name('status');
+
+        // Get public observer information (no sensitive data)
+        Route::get('/info', function () {
+            return response()->json([
+                'success' => true,
+                'message' => 'Observer pattern information retrieved successfully',
+                'data' => [
+                    'pattern_name' => 'Observer Pattern',
+                    'implementation_by' => 'Jayvian Lazarus Jerome',
+                    'description' => 'Handles system-wide event notifications and logging',
+                    'available_subjects' => ['UserSubject', 'BookingSubject', 'ReportSubject'],
+                    'available_observers' => ['EmailNotificationObserver', 'LoggingObserver', 'AnalyticsObserver', 'AdminNotificationObserver'],
+                    'features' => [
+                        'Real-time event notifications',
+                        'Comprehensive audit logging',
+                        'Analytics and metrics tracking',
+                        'Admin notification management'
+                    ]
+                ],
+                'meta' => [
+                    'timestamp' => now()->toISOString(),
+                    'version' => 'v1',
+                    'pattern' => 'Observer Pattern API'
+                ]
+            ]);
+        })
+        ->middleware('throttle:20,1')
+        ->name('info');
+    });
+
+    // ========================================================================
     // *PAYMENTS API ROUTES*
     // ========================================================================
     Route::prefix('payments')->group(function () {
@@ -240,6 +397,12 @@ Route::middleware('auth:sanctum')->group(function () {
 // booking-state-change: 15 requests per minute per user
 // booking-cancellation: 3 requests per minute per user
 
+// Observer Module (Observer Pattern) - Jayvian Lazarus Jerome:
+// observer-management: 20 requests per minute per admin
+// observer-bulk-operations: 5 requests per minute per admin
+// observer-event-trigger: 10 requests per minute per admin
+// observer-events-access: 100 requests per minute per admin
+
 // ============================================================================
 // *FALLBACK ROUTE FOR API*
 // ============================================================================
@@ -266,7 +429,22 @@ Route::fallback(function () {
             'POST /api/v1/bookings/{id}/activate' => 'Activate booking (Auth Required)',
             'POST /api/v1/bookings/{id}/complete' => 'Complete booking (Auth Required)',
             'POST /api/v1/bookings/check-availability' => 'Check booking availability (Public)',
-            'GET /api/v1/bookings/statistics' => 'Get booking statistics (Auth Required)'
+            'GET /api/v1/bookings/statistics' => 'Get booking statistics (Auth Required)',
+
+            // Observer endpoints (NEW - Observer Pattern - Jayvian Lazarus Jerome)
+            'GET /api/v1/observers' => 'Get all observers (Admin Required)',
+            'GET /api/v1/observers/{observerName}' => 'Get specific observer (Admin Required)',
+            'POST /api/v1/observers/{observerName}/attach' => 'Attach observer (Admin Required)',
+            'DELETE /api/v1/observers/{observerName}/detach' => 'Detach observer (Admin Required)',
+            'POST /api/v1/observers/bulk/attach' => 'Bulk attach observers (Admin Required)',
+            'GET /api/v1/observers/subjects' => 'Get all subjects (Admin Required)',
+            'GET /api/v1/observers/subjects/{subjectName}' => 'Get specific subject (Admin Required)',
+            'POST /api/v1/observers/events/trigger' => 'Trigger event manually (Admin Required)',
+            'GET /api/v1/observers/events' => 'Get event history (Admin Required)',
+            'GET /api/v1/observers/statistics' => 'Get observer statistics (Public)',
+            'GET /api/v1/observers/health' => 'System health check (Public)',
+            'GET /api/v1/observers/status' => 'Get system status (Auth Required)',
+            'GET /api/v1/observers/info' => 'Get pattern information (Auth Required)'
         ],
         'authentication' => [
             'method' => 'Bearer Token (Sanctum)',
