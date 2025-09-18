@@ -334,8 +334,8 @@
                     
                 </div>
                 <h4 class="member-name">Jayvian Lazarus</h4>
-                <p class="member-role">Project Lead & Full-Stack Developer</p>
-                <p class="member-description">Leading the development of RentWheels with expertise in user authentication, password management, and overall system architecture. Passionate about creating seamless user experiences.</p>
+                <p class="member-role">Customer and Admin Provider</p>
+                <p class="member-description">Utilizes the development of RentWheels with expertise in user authentication, password management, and overall system architecture. Passionate about creating seamless user experiences.</p>
             </div>
             
             <!-- Team Member 2 - Tan Xing Ye -->
@@ -364,8 +364,8 @@
                     <img src="/images/team/zhengyao.jpg" alt="Chong Zheng Yao">
                 </div>
                 <h4 class="member-name">Chong Zheng Yao</h4>
-                <p class="member-role">Backend Developer</p>
-                <p class="member-description">Focuses on server-side development, database optimization, and API integration. Ensures the platform runs smoothly and efficiently to handle all user requests.</p>
+                <p class="member-role">Booking & Rental Processor</p>
+                <p class="member-description">Handles bookings, processes rental requests, manages documentation, and ensures smooth customer service from booking to return.</p>
             </div>
         </div>
     </div>

@@ -315,6 +315,9 @@
                                 <a href="{{ route('admin.customers') }}" class="btn btn-outline-secondary">
                                     <i class="fas fa-times me-1"></i>Clear
                                 </a>
+                                <a href="{{ route('admin.customers.export', request()->query()) }}" class="btn btn-outline-info" target="_blank">
+                                    <i class="fas fa-file-pdf me-1"></i>Export PDF
+                                </a>
                                 <button type="button" class="btn btn-success ms-auto" data-bs-toggle="modal" data-bs-target="#addCustomerModal">
                                     <i class="fas fa-user-plus me-1"></i>Add Customer
                                 </button>
