@@ -18,12 +18,14 @@ use App\Factory\VehicleFactoryRegistry; // Factory Method Pattern - Tan Xing Ye
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
-class AdminController extends Controller {
+class AdminController extends Controller
+{
 
     /**
      * Show admin login form
      */
-    public function showLogin() {
+    public function showLogin()
+    {
         // Additional check: If user is already logged in
         if (Auth::check()) {
             $user = Auth::user();
@@ -32,7 +34,7 @@ class AdminController extends Controller {
             } else {
                 // Regular user trying to access admin login - redirect to user dashboard
                 return redirect()->route('dashboard')
-                                ->with('error', 'Access denied. You are logged in as a regular user.');
+                    ->with('error', 'Access denied. You are logged in as a regular user.');
             }
         }
 
@@ -42,7 +44,8 @@ class AdminController extends Controller {
     /**
      * Handle admin login submission
      */
-    public function login(Request $request) {
+    public function login(Request $request)
+    {
         // Additional check: If user is already logged in
         if (Auth::check()) {
             $user = Auth::user();
@@ -57,7 +60,7 @@ class AdminController extends Controller {
         $validator = Validator::make($request->all(), [
             'email' => 'required|email|max:255',
             'password' => 'required|min:6',
-                ], [
+        ], [
             'email.required' => 'Admin email is required.',
             'email.email' => 'Please enter a valid email address.',
             'password.required' => 'Admin password is required.',
@@ -66,8 +69,8 @@ class AdminController extends Controller {
 
         if ($validator->fails()) {
             return back()
-                            ->withErrors($validator)
-                            ->withInput($request->only('email'));
+                ->withErrors($validator)
+                ->withInput($request->only('email'));
         }
 
         // Get credentials
@@ -82,34 +85,35 @@ class AdminController extends Controller {
             if (!$user->is_admin) {
                 Auth::logout();
                 return back()->withErrors([
-                            'email' => 'Access denied. Admin privileges required. This incident has been logged.'
-                        ])->withInput($request->only('email'));
+                    'email' => 'Access denied. Admin privileges required. This incident has been logged.'
+                ])->withInput($request->only('email'));
             }
 
             // Check if admin account is active
             if ($user->status !== 'active') {
                 Auth::logout();
                 return back()->withErrors([
-                            'email' => 'Your admin account has been suspended.'
-                        ])->withInput($request->only('email'));
+                    'email' => 'Your admin account has been suspended.'
+                ])->withInput($request->only('email'));
             }
 
             $request->session()->regenerate();
 
             return redirect()->route('admin.dashboard')
-                            ->with('success', 'Welcome back, Admin ' . $user->name . '!');
+                ->with('success', 'Welcome back, Admin ' . $user->name . '!');
         }
 
         // Authentication failed
         return back()->withErrors([
-                    'email' => 'The provided credentials do not match our admin records.',
-                ])->withInput($request->only('email'));
+            'email' => 'The provided credentials do not match our admin records.',
+        ])->withInput($request->only('email'));
     }
 
     /**
      * Show specific vehicle for admin
      */
-    public function showVehicle(Vehicle $vehicle) {
+    public function showVehicle(Vehicle $vehicle)
+    {
         $this->ensureAdminAccess();
 
         // Load the rental rate relationship
@@ -121,7 +125,8 @@ class AdminController extends Controller {
     /**
      * Show admin dashboard
      */
-    public function dashboard() {
+    public function dashboard()
+    {
         $this->ensureAdminAccess();
 
         // Calculate total revenue from paid bookings
@@ -129,21 +134,21 @@ class AdminController extends Controller {
 
         // Calculate monthly growth
         $thisMonth = Booking::where('payment_status', 'paid')
-                ->whereMonth('created_at', now()->month)
-                ->whereYear('created_at', now()->year)
-                ->sum('total_amount');
+            ->whereMonth('created_at', now()->month)
+            ->whereYear('created_at', now()->year)
+            ->sum('total_amount');
 
         $lastMonth = Booking::where('payment_status', 'paid')
-                ->whereMonth('created_at', now()->subMonth()->month)
-                ->whereYear('created_at', now()->subMonth()->year)
-                ->sum('total_amount');
+            ->whereMonth('created_at', now()->subMonth()->month)
+            ->whereYear('created_at', now()->subMonth()->year)
+            ->sum('total_amount');
 
         $revenueGrowth = $lastMonth > 0 ? (($thisMonth - $lastMonth) / $lastMonth) * 100 : 0;
 
         // Calculate new users this week
         $newUsersThisWeek = User::where('is_admin', false)
-                ->whereBetween('created_at', [now()->startOfWeek(), now()->endOfWeek()])
-                ->count();
+            ->whereBetween('created_at', [now()->startOfWeek(), now()->endOfWeek()])
+            ->count();
 
         // Get dashboard statistics
         $stats = [
@@ -166,11 +171,12 @@ class AdminController extends Controller {
     /**
      * Admin logout
      */
-    public function logout(Request $request) {
+    public function logout(Request $request)
+    {
         // Ensure user is admin before logout
         if (!Auth::check() || !Auth::user()->is_admin) {
             return redirect()->route('admin.login')
-                            ->with('error', 'Invalid logout attempt.');
+                ->with('error', 'Invalid logout attempt.');
         }
 
         $adminName = Auth::user()->name ?? 'Admin';
@@ -181,13 +187,14 @@ class AdminController extends Controller {
         $request->session()->regenerateToken();
 
         return redirect()->route('admin.login')
-                        ->with('success', 'Goodbye ' . $adminName . '! You have been logged out successfully.');
+            ->with('success', 'Goodbye ' . $adminName . '! You have been logged out successfully.');
     }
 
     /**
      * User Management (General users list - keeping original functionality)
      */
-    public function users() {
+    public function users()
+    {
         $this->ensureAdminAccess();
         $users = User::where('is_admin', false)->paginate(15);
         return view('admin.users', compact('users'));
@@ -196,7 +203,8 @@ class AdminController extends Controller {
     /**
      * Customer Management - Comprehensive customer management with filtering and search
      */
-    public function customers(Request $request) {
+    public function customers(Request $request)
+    {
         $this->ensureAdminAccess();
 
         // Start with base query
@@ -207,7 +215,7 @@ class AdminController extends Controller {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                        ->orWhere('email', 'like', "%{$search}%");
+                    ->orWhere('email', 'like', "%{$search}%");
             });
         }
 
@@ -243,18 +251,19 @@ class AdminController extends Controller {
         $suspendedUsers = User::where('is_admin', false)->where('status', 'suspended')->count();
 
         return view('admin.customers', compact(
-                        'users',
-                        'totalUsers',
-                        'activeUsers',
-                        'inactiveUsers',
-                        'suspendedUsers'
-                ));
+            'users',
+            'totalUsers',
+            'activeUsers',
+            'inactiveUsers',
+            'suspendedUsers'
+        ));
     }
 
     /**
      * Store new customer
      */
-    public function storeCustomer(Request $request) {
+    public function storeCustomer(Request $request)
+    {
         $this->ensureAdminAccess();
         $request->validate([
             'name' => 'required|string|max:255',
@@ -271,28 +280,29 @@ class AdminController extends Controller {
                 'is_admin' => false
             ]);
             return response()->json([
-                        'success' => true,
-                        'message' => 'Customer created successfully!',
-                        'user' => $user
+                'success' => true,
+                'message' => 'Customer created successfully!',
+                'user' => $user
             ]);
         } catch (\Exception $e) {
             return response()->json([
-                        'success' => false,
-                        'message' => 'Error creating customer: ' . $e->getMessage()
-                            ], 500);
+                'success' => false,
+                'message' => 'Error creating customer: ' . $e->getMessage()
+            ], 500);
         }
     }
 
     /**
      * Update customer
      */
-    public function updateCustomer(Request $request, User $user) {
+    public function updateCustomer(Request $request, User $user)
+    {
         $this->ensureAdminAccess();
         if ($user->is_admin) {
             return response()->json([
-                        'success' => false,
-                        'message' => 'Cannot edit admin users'
-                            ], 403);
+                'success' => false,
+                'message' => 'Cannot edit admin users'
+            ], 403);
         }
         $request->validate([
             'name' => 'required|string|max:255',
@@ -306,52 +316,54 @@ class AdminController extends Controller {
                 'status' => $request->status
             ]);
             return response()->json([
-                        'success' => true,
-                        'message' => 'Customer updated successfully!',
-                        'user' => $user
+                'success' => true,
+                'message' => 'Customer updated successfully!',
+                'user' => $user
             ]);
         } catch (\Exception $e) {
             return response()->json([
-                        'success' => false,
-                        'message' => 'Error updating customer: ' . $e->getMessage()
-                            ], 500);
+                'success' => false,
+                'message' => 'Error updating customer: ' . $e->getMessage()
+            ], 500);
         }
     }
 
     //Delete customer
-    public function deleteCustomer(User $user) {
+    public function deleteCustomer(User $user)
+    {
         $this->ensureAdminAccess();
         if ($user->is_admin) {
             return response()->json([
-                        'success' => false,
-                        'message' => 'Cannot delete admin users'
-                            ], 403);
+                'success' => false,
+                'message' => 'Cannot delete admin users'
+            ], 403);
         }
         $activeBookings = Booking::where('user_id', $user->id)
-                ->whereIn('status', ['active', 'confirmed', 'ongoing'])
-                ->count();
+            ->whereIn('status', ['active', 'confirmed', 'ongoing'])
+            ->count();
         if ($activeBookings > 0) {
             return response()->json([
-                        'success' => false,
-                        'message' => 'Cannot delete customer with active bookings'
-                            ], 400);
+                'success' => false,
+                'message' => 'Cannot delete customer with active bookings'
+            ], 400);
         }
         try {
             $user->delete();
             return response()->json([
-                        'success' => true,
-                        'message' => 'Customer deleted successfully!'
+                'success' => true,
+                'message' => 'Customer deleted successfully!'
             ]);
         } catch (\Exception $e) {
             return response()->json([
-                        'success' => false,
-                        'message' => 'Error deleting customer: ' . $e->getMessage()
-                            ], 500);
+                'success' => false,
+                'message' => 'Error deleting customer: ' . $e->getMessage()
+            ], 500);
         }
     }
 
     //Vehicle Management -  filtering & search - Tan Xing Ye
-    public function vehicles(Request $request) {
+    public function vehicles(Request $request)
+    {
         $this->ensureAdminAccess();
 
         $query = Vehicle::with('rentalRate');
@@ -361,8 +373,8 @@ class AdminController extends Controller {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('make', 'like', "%{$search}%")
-                        ->orWhere('model', 'like', "%{$search}%")
-                        ->orWhere('license_plate', 'like', "%{$search}%");
+                    ->orWhere('model', 'like', "%{$search}%")
+                    ->orWhere('license_plate', 'like', "%{$search}%");
             });
         }
 
@@ -385,13 +397,13 @@ class AdminController extends Controller {
                 break;
             case 'price_low':
                 $query->join('rental_rates', 'vehicles.id', '=', 'rental_rates.vehicle_id')
-                        ->orderBy('rental_rates.daily_rate', 'asc')
-                        ->select('vehicles.*');
+                    ->orderBy('rental_rates.daily_rate', 'asc')
+                    ->select('vehicles.*');
                 break;
             case 'price_high':
                 $query->join('rental_rates', 'vehicles.id', '=', 'rental_rates.vehicle_id')
-                        ->orderBy('rental_rates.daily_rate', 'desc')
-                        ->select('vehicles.*');
+                    ->orderBy('rental_rates.daily_rate', 'desc')
+                    ->select('vehicles.*');
                 break;
             case 'mileage':
                 $query->orderBy('current_mileage', 'asc');
@@ -411,16 +423,17 @@ class AdminController extends Controller {
         $maintenanceVehicles = Vehicle::where('status', 'maintenance')->count();
 
         return view('admin.vehicles', compact(
-                        'vehicles',
-                        'totalVehicles',
-                        'availableVehicles',
-                        'rentedVehicles',
-                        'maintenanceVehicles'
-                ));
+            'vehicles',
+            'totalVehicles',
+            'availableVehicles',
+            'rentedVehicles',
+            'maintenanceVehicles'
+        ));
     }
 
     // vehicle status
-    public function toggleStatus(Vehicle $vehicle) {
+    public function toggleStatus(Vehicle $vehicle)
+    {
         $this->ensureAdminAccess();
 
         $statusOrder = ['available', 'rented', 'maintenance'];
@@ -434,13 +447,15 @@ class AdminController extends Controller {
     }
 
     //Show create vehicle list
-    public function createVehicle() {
+    public function createVehicle()
+    {
         $this->ensureAdminAccess();
         return view('admin.create');
     }
 
     //Store new vehicle  - Factory Method Pattern - Tan Xing Ye
-    public function storeVehicle(Request $request) {
+    public function storeVehicle(Request $request)
+    {
         $this->ensureAdminAccess();
 
         $validated = $request->validate([
@@ -475,20 +490,21 @@ class AdminController extends Controller {
             $vehicle = $creator->processVehicle($validated);
 
             return redirect()->route('admin.vehicles')
-                            ->with('success', 'Vehicle added successfully using Factory Method Pattern!');
+                ->with('success', 'Vehicle added successfully using Factory Method Pattern!');
         } catch (\InvalidArgumentException $e) {
             return redirect()->back()
-                            ->withErrors(['type' => 'Unsupported vehicle type: ' . $validated['type']])
-                            ->withInput();
+                ->withErrors(['type' => 'Unsupported vehicle type: ' . $validated['type']])
+                ->withInput();
         } catch (\Exception $e) {
             return redirect()->back()
-                            ->withErrors(['error' => 'Failed to create vehicle: ' . $e->getMessage()])
-                            ->withInput();
+                ->withErrors(['error' => 'Failed to create vehicle: ' . $e->getMessage()])
+                ->withInput();
         }
     }
 
     //show edit vehicle
-    public function editVehicle(Vehicle $vehicle) {
+    public function editVehicle(Vehicle $vehicle)
+    {
         $this->ensureAdminAccess();
 
         $vehicle->load('rentalRate');
@@ -497,7 +513,8 @@ class AdminController extends Controller {
     }
 
     //Update/edit vehicle - Factory Method Pattern -Tan Xing Ye
-    public function updateVehicle(Request $request, Vehicle $vehicle) {
+    public function updateVehicle(Request $request, Vehicle $vehicle)
+    {
         $this->ensureAdminAccess();
 
         $validated = $request->validate([
@@ -538,26 +555,27 @@ class AdminController extends Controller {
             $vehicle = $creator->updateVehicle($vehicle, $validated);
 
             return redirect()->route('admin.vehicles')
-                            ->with('success', 'Vehicle updated successfully using Factory Method Pattern!');
+                ->with('success', 'Vehicle updated successfully using Factory Method Pattern!');
         } catch (\InvalidArgumentException $e) {
             return redirect()->back()
-                            ->withErrors(['type' => 'Unsupported vehicle type: ' . $validated['type']])
-                            ->withInput();
+                ->withErrors(['type' => 'Unsupported vehicle type: ' . $validated['type']])
+                ->withInput();
         } catch (\Exception $e) {
             return redirect()->back()
-                            ->withErrors(['error' => 'Failed to update vehicle: ' . $e->getMessage()])
-                            ->withInput();
+                ->withErrors(['error' => 'Failed to update vehicle: ' . $e->getMessage()])
+                ->withInput();
         }
     }
 
     //Delete vehicle
-    public function deleteVehicle(Vehicle $vehicle) {
+    public function deleteVehicle(Vehicle $vehicle)
+    {
         $this->ensureAdminAccess();
 
         // Check if vehicle has active bookings
         $activeBookings = Booking::where('vehicle_id', $vehicle->id)
-                ->whereIn('status', ['active', 'confirmed', 'ongoing'])
-                ->count();
+            ->whereIn('status', ['active', 'confirmed', 'ongoing'])
+            ->count();
 
         if ($activeBookings > 0) {
             return back()->with('error', 'Cannot delete vehicle with active bookings.');
@@ -579,7 +597,8 @@ class AdminController extends Controller {
     }
 
     //error Get type defaults using Factory Method Pattern - Tan Xing Ye
-    public function getTypeDefaults(Request $request) {
+    public function getTypeDefaults(Request $request)
+    {
         $this->ensureAdminAccess();
 
         $type = $request->get('type');
@@ -598,7 +617,8 @@ class AdminController extends Controller {
 
     //Booking Management - State Pattern - Chong Zheng Yao
 
-    public function bookings(Request $request) {
+    public function bookings(Request $request)
+    {
         $this->ensureAdminAccess();
 
         $query = Booking::with(['user', 'vehicle']);
@@ -611,10 +631,10 @@ class AdminController extends Controller {
             $search = $request->search;
             $query->whereHas('user', function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                        ->orWhere('email', 'like', "%{$search}%");
+                    ->orWhere('email', 'like', "%{$search}%");
             })->orWhereHas('vehicle', function ($q) use ($search) {
                 $q->where('make', 'like', "%{$search}%")
-                        ->orWhere('model', 'like', "%{$search}%");
+                    ->orWhere('model', 'like', "%{$search}%");
             });
         }
 
@@ -696,7 +716,8 @@ class AdminController extends Controller {
     }
 
     //Show booking details (AJAX) - State Pattern - Chong Zheng Yao
-    public function showBooking(Booking $booking) {
+    public function showBooking(Booking $booking)
+    {
         $this->ensureAdminAccess();
 
         $booking->load(['user', 'vehicle']);
@@ -733,7 +754,8 @@ class AdminController extends Controller {
     }
 
     //Update booking status - Chong Zheng Yao
-    public function updateBookingStatus(Request $request, Booking $booking) {
+    public function updateBookingStatus(Request $request, Booking $booking)
+    {
         $this->ensureAdminAccess();
 
         $request->validate([
@@ -751,7 +773,7 @@ class AdminController extends Controller {
             return response()->json([
                 'success' => false,
                 'message' => "Cannot transition from '{$currentStatus}' to '{$newStatus}'. " .
-                            "Allowed transitions: " . implode(', ', $booking->getAvailableActions())
+                    "Allowed transitions: " . implode(', ', $booking->getAvailableActions())
             ], 400);
         }
 
@@ -779,7 +801,7 @@ class AdminController extends Controller {
                         return response()->json([
                             'success' => false,
                             'message' => 'Cannot activate booking before pickup time: ' .
-                                       $booking->pickup_datetime->format('M d, Y h:i A')
+                                $booking->pickup_datetime->format('M d, Y h:i A')
                         ], 400);
                     }
                     $transitioned = $booking->activate();
@@ -840,7 +862,6 @@ class AdminController extends Controller {
 
             // Redirect for regular requests
             return back()->with('success', $message);
-
         } catch (\Exception $e) {
             Log::error('Booking status update failed', [
                 'booking_id' => $booking->id,
@@ -860,7 +881,8 @@ class AdminController extends Controller {
     }
 
     // Confirm a booking - Chong Zheng Yao
-    public function confirmBooking(Request $request, Booking $booking) {
+    public function confirmBooking(Request $request, Booking $booking)
+    {
         $this->ensureAdminAccess();
 
         if (!$booking->canPerformAction('confirm')) {
@@ -885,8 +907,9 @@ class AdminController extends Controller {
         ], 400);
     }
 
-   //Activate a booking from admin panel
-    public function activateBooking(Request $request, Booking $booking) {
+    //Activate a booking from admin panel
+    public function activateBooking(Request $request, Booking $booking)
+    {
         $this->ensureAdminAccess();
 
         if (!$booking->canPerformAction('activate')) {
@@ -911,8 +934,9 @@ class AdminController extends Controller {
         ], 400);
     }
 
-  //Complete booking
-    public function completeBooking(Request $request, Booking $booking) {
+    //Complete booking
+    public function completeBooking(Request $request, Booking $booking)
+    {
         $this->ensureAdminAccess();
 
         $validated = $request->validate([
@@ -943,7 +967,8 @@ class AdminController extends Controller {
     }
 
     //Cancel a booking
-    public function cancelBooking(Request $request, Booking $booking) {
+    public function cancelBooking(Request $request, Booking $booking)
+    {
         $this->ensureAdminAccess();
 
         $validated = $request->validate([
@@ -972,88 +997,126 @@ class AdminController extends Controller {
     }
 
     //Get booking state information
-    public function pickupVehicle(Request $request, $bookingId)
-{
-    $booking = Booking::with('vehicle')->findOrFail($bookingId);
+    /**
+     * Confirm vehicle pickup - activate booking
+     */
+    public function pickupVehicle(Request $request, Booking $booking)
+    {
+        $this->ensureAdminAccess();
 
-    // Validate that booking can be activated
-    if (!$booking->canPerformAction('activate')) {
-        return back()->with('error', 'Cannot activate this booking. Current status: ' . $booking->status);
-    }
+        $booking->load('vehicle'); // Load the vehicle relationship
 
-    try {
-        // Activate the booking using state pattern
-        $activated = $booking->activate();
-
-        if (!$activated) {
-            return back()->with('error', 'Unable to activate booking. Please check booking status.');
+        // Validate that booking can be activated
+        if (!$booking->canPerformAction('activate')) {
+            if (request()->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Cannot activate this booking. Current status: ' . $booking->status
+                ], 400);
+            }
+            return back()->with('error', 'Cannot activate this booking. Current status: ' . $booking->status);
         }
 
-        Log::info("Admin confirmed pickup for booking {$booking->id} - vehicle {$booking->vehicle->id}");
+        try {
+            // Activate the booking using state pattern
+            $activated = $booking->activate();
 
-        return back()->with('success', 'Vehicle pickup confirmed! Booking is now active.');
+            if (!$activated) {
+                if (request()->ajax()) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Unable to activate booking. Please check booking status.'
+                    ], 400);
+                }
+                return back()->with('error', 'Unable to activate booking. Please check booking status.');
+            }
 
-    } catch (\Exception $e) {
-        Log::error("Failed to confirm pickup for booking {$booking->id}: " . $e->getMessage());
-        return back()->with('error', 'Failed to confirm vehicle pickup. Please try again.');
+            Log::info("Admin confirmed pickup for booking {$booking->id} - vehicle {$booking->vehicle->id}");
+
+            // Refresh booking to get updated state information
+            $booking->refresh();
+
+            if (request()->ajax()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Vehicle pickup confirmed! Booking is now active.',
+                    'newStatus' => $booking->status,
+                    'availableActions' => $booking->getAvailableActions(),
+                    'stateMessage' => $booking->getStateMessage(),
+                    'statusBadgeColor' => $booking->getStatusBadgeColorAttribute()
+                ]);
+            }
+
+            return back()->with('success', 'Vehicle pickup confirmed! Booking is now active.');
+        } catch (\Exception $e) {
+            Log::error("Failed to confirm pickup for booking {$booking->id}: " . $e->getMessage());
+
+            if (request()->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to confirm vehicle pickup. Please try again.'
+                ], 500);
+            }
+
+            return back()->with('error', 'Failed to confirm vehicle pickup. Please try again.');
+        }
     }
-}
     //Return vehicle - calculate late fees if applicable
-  public function returnVehicle(Request $request, $bookingId)
-{
-    $booking = Booking::with('vehicle')->findOrFail($bookingId);
+    public function returnVehicle(Request $request, Booking $booking)
+    {
+        $booking->load('vehicle');
 
-    // Validate that booking can be completed
-    if (!$booking->canPerformAction('complete')) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Cannot complete this booking. Current status: ' . $booking->status
-        ], 400);
-    }
-
-    $data = $request->validate([
-        'damage_charges' => 'nullable|numeric|min:0',
-        'return_notes' => 'nullable|string|max:500',
-        'actual_return_datetime' => 'nullable|date'
-    ]);
-
-    // Set actual return time if not provided
-    if (!isset($data['actual_return_datetime'])) {
-        $data['actual_return_datetime'] = now();
-    }
-
-    try {
-        // Complete the booking using state pattern
-        $completed = $booking->complete($data);
-
-        if (!$completed) {
+        // Validate that booking can be completed
+        if (!$booking->canPerformAction('complete')) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unable to complete booking. Please check booking status.'
+                'message' => 'Cannot complete this booking. Current status: ' . $booking->status
             ], 400);
         }
 
-        Log::info("Admin completed booking {$booking->id} and returned vehicle {$booking->vehicle->id}");
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Vehicle returned successfully! Booking completed and vehicle is now available.'
+        $data = $request->validate([
+            'damage_charges' => 'nullable|numeric|min:0',
+            'return_notes' => 'nullable|string|max:500',
+            'actual_return_datetime' => 'nullable|date'
         ]);
 
-    } catch (\Exception $e) {
-        Log::error("Failed to return vehicle for booking {$booking->id}: " . $e->getMessage());
+        // Set actual return time if not provided
+        if (!isset($data['actual_return_datetime'])) {
+            $data['actual_return_datetime'] = now();
+        }
 
-        return response()->json([
-            'success' => false,
-            'message' => 'Failed to complete vehicle return. Please try again.'
-        ], 500);
+        try {
+            // Complete the booking using state pattern
+            $completed = $booking->complete($data);
+
+            if (!$completed) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unable to complete booking. Please check booking status.'
+                ], 400);
+            }
+
+            Log::info("Admin completed booking {$booking->id} and returned vehicle {$booking->vehicle->id}");
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Vehicle returned successfully! Booking completed and vehicle is now available.'
+            ]);
+        } catch (\Exception $e) {
+            Log::error("Failed to return vehicle for booking {$booking->id}: " . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to complete vehicle return. Please try again.'
+            ], 500);
+        }
     }
-}
 
     /**
      * Create additional charges payment for late fees and damages
      */
-    private function createAdditionalChargesPayment(Booking $booking, $totalCharges, $lateFees, $damageCharges) {
+    private function createAdditionalChargesPayment(Booking $booking, $totalCharges, $lateFees, $damageCharges)
+    {
         // Create a payment record for the additional charges
         $payment = \App\Models\Payment::create([
             'booking_id' => $booking->id,
@@ -1080,7 +1143,8 @@ class AdminController extends Controller {
     /**
      * Payment Management - Chiew Chun Sheng will manage payments here
      */
-    public function payments() {
+    public function payments()
+    {
         $this->ensureAdminAccess();
         // Chiew Chun Sheng will manage payments here
         return view('admin.payments');
@@ -1089,7 +1153,8 @@ class AdminController extends Controller {
     /**
      * Display the reports page
      */
-    public function reports(Request $request) {
+    public function reports(Request $request)
+    {
         $this->ensureAdminAccess();
 
         // Changed default date range to show all data instead of just current month
@@ -1111,7 +1176,8 @@ class AdminController extends Controller {
     /**
      * Filter reports via AJAX
      */
-    public function filterReports(Request $request) {
+    public function filterReports(Request $request)
+    {
         $this->ensureAdminAccess();
 
         try {
@@ -1139,7 +1205,8 @@ class AdminController extends Controller {
     /**
      * Export reports - redirect to dedicated ReportsController
      */
-    public function exportReports(Request $request) {
+    public function exportReports(Request $request)
+    {
         $reportsController = new ReportsController();
         return $reportsController->exportPDF($request);
     }
@@ -1150,8 +1217,8 @@ class AdminController extends Controller {
     private function getReportsStats($dateFrom, $dateTo)
     {
         $totalRevenue = Booking::whereBetween('created_at', [$dateFrom, $dateTo])
-    ->whereIn('status', ['completed', 'active', 'confirmed'])
-    ->sum('total_amount');
+            ->whereIn('status', ['completed', 'active', 'confirmed'])
+            ->sum('total_amount');
 
         // Changed from activeRentals to totalVehicles
         $totalVehicles = Vehicle::count();
@@ -1234,8 +1301,8 @@ class AdminController extends Controller {
     {
         // Top users by bookings
         $topUsers = User::withCount(['bookings' => function ($query) use ($dateFrom, $dateTo) {
-                $query->whereBetween('created_at', [$dateFrom, $dateTo]);
-            }])
+            $query->whereBetween('created_at', [$dateFrom, $dateTo]);
+        }])
             ->withSum(['bookings as total_spent' => function ($query) use ($dateFrom, $dateTo) {
                 $query->whereBetween('created_at', [$dateFrom, $dateTo])
                     ->whereIn('status', ['completed', 'active', 'confirmed']);
@@ -1256,8 +1323,8 @@ class AdminController extends Controller {
 
         // Vehicle performance
         $vehiclePerformance = Vehicle::withCount(['bookings' => function ($query) use ($dateFrom, $dateTo) {
-                $query->whereBetween('created_at', [$dateFrom, $dateTo]);
-            }])
+            $query->whereBetween('created_at', [$dateFrom, $dateTo]);
+        }])
             ->withSum(['bookings as revenue_generated' => function ($query) use ($dateFrom, $dateTo) {
                 $query->whereBetween('created_at', [$dateFrom, $dateTo])
                     ->whereIn('status', ['completed', 'active', 'confirmed']);
@@ -1311,7 +1378,8 @@ class AdminController extends Controller {
         ];
     }
 
-    private function ensureAdminAccess() {
+    private function ensureAdminAccess()
+    {
         if (!Auth::check()) {
             abort(401, 'Authentication required');
         }
