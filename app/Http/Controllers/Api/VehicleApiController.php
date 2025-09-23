@@ -43,22 +43,6 @@ class VehicleApiController extends Controller
 
     /**
      * Display a listing of vehicles with filtering and pagination
-     *
-     * @param Request $request
-     * @return JsonResponse
-     *
-     * @OA\Get(
-     *     path="/api/vehicles",
-     *     summary="Get all vehicles with optional filtering",
-     *     tags={"Vehicles"},
-     *     @OA\Parameter(name="search", in="query", description="Search by make, model, license plate"),
-     *     @OA\Parameter(name="type", in="query", description="Filter by vehicle type"),
-     *     @OA\Parameter(name="status", in="query", description="Filter by availability status"),
-     *     @OA\Parameter(name="page", in="query", description="Page number for pagination"),
-     *     @OA\Parameter(name="per_page", in="query", description="Items per page (max 50)"),
-     *     @OA\Response(response=200, description="Successful operation"),
-     *     @OA\Response(response=400, description="Invalid request parameters")
-     * )
      */
     public function index(Request $request): JsonResponse
     {
@@ -378,19 +362,6 @@ class VehicleApiController extends Controller
 
     /**
      * Check vehicle availability for specific period
-     *
-     * @param Request $request
-     * @param int $id
-     * @return JsonResponse
-     *
-     * @OA\Post(
-     *     path="/api/vehicles/{id}/check-availability",
-     *     summary="Check if vehicle is available for booking period",
-     *     tags={"Vehicles"},
-     *     @OA\Parameter(name="id", in="path", required=true, description="Vehicle ID"),
-     *     @OA\RequestBody(required=true, description="Date range to check"),
-     *     @OA\Response(response=200, description="Availability checked successfully")
-     * )
      */
     public function checkAvailability(Request $request, int $id): JsonResponse
     {

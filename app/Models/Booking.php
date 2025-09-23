@@ -329,7 +329,7 @@ class Booking extends Model
                 $oldStatus = $booking->getOriginal('status');
                 $newStatus = $booking->status;
 
-                // Create temporary booking with old status to check transition
+                // Create booking with old status to check transition
                 $tempBooking = new static(['status' => $oldStatus]);
                 $tempState = StateFactory::create($tempBooking);
 

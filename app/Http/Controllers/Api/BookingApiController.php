@@ -288,7 +288,8 @@ class BookingApiController extends Controller
                 'action' => 'confirm'
             ]);
 
-            return $this->errorResponse('Too many state change requests. Please try again later.', 429);
+            return $this->errorResponse('Too many state change requests.
+            Please try again later.', 429);
         }
 
         try {

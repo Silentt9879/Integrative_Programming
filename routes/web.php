@@ -178,7 +178,7 @@ Route::prefix('admin')->name('admin.')->middleware(\App\Http\Middleware\AdminMid
 // Enhanced controllers with Observer Pattern for event-driven notifications
 // Handles user registration, booking changes, and report generation events
 
-// Observer Pattern Testing & Debug Routes (ADDED - Missing from original)
+// Observer Pattern Testing & Debug Routes 
 Route::get('/test-observer', function () {
     return view('test-observer');
 })->name('test.observer');

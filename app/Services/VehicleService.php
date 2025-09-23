@@ -123,7 +123,8 @@ class VehicleService
 
             DB::commit();
 
-            Log::info('Vehicle created successfully', ['vehicle_id' => $vehicle->id, 'type' => $data['type']]);
+            Log::info('Vehicle created successfully', ['vehicle_id' => $vehicle->id,
+            'type' => $data['type']]);
 
             return $vehicle;
         } catch (\Exception $e) {

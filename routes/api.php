@@ -1,30 +1,27 @@
 <?php
+
+
+// routes/api.php - Vehicle Rental System API Routes
+// BMIT3173 Assignment - Vehicle Module API - Tan Xing Ye (Factory Pattern)
+// BMIT3173 Assignment - Booking Module API - Chong Zheng Yao (State Pattern)
+// BMIT3173 Assignment - Observer Module API - Jayvian Lazarus Jerome (Observer Pattern)
+
+use App\Http\Controllers\Api\VehicleApiController;// Vehicle API with Factory Pattern - Tan Xing Ye
+use App\Http\Controllers\Api\PaymentApiController;
+use App\Http\Controllers\Api\ReportsApiController;
+use App\Http\Controllers\Api\BookingApiController; // Booking API with State Pattern - Chong Zheng Yao
+use App\Http\Controllers\Api\ObserverApiController; // Observer API with Observer Pattern - Jayvian Lazarus Jerome
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
+
 Route::get('/simple-test', function () {
     return response()->json(['message' => 'Basic API routing works!']);
 });
-
-// routes/api.php - Vehicle Rental System API Routes
-// BMIT3173 Assignment - Vehicle Module API - Tan Xing Ye
-// BMIT3173 Assignment - Booking Module API - [Your Name] (State Pattern Implementation)
-// BMIT3173 Assignment - Observer Module API - Jayvian Lazarus Jerome (Observer Pattern Implementation)
-
-use App\Http\Controllers\Api\VehicleApiController;
-use App\Http\Controllers\Api\PaymentApiController;
-use App\Http\Controllers\Api\ReportsApiController;
-use App\Http\Controllers\Api\BookingApiController; // NEW: Booking API with State Pattern
-use App\Http\Controllers\Api\ObserverApiController; // NEW: Observer API with Observer Pattern - Jayvian Lazarus Jerome
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
 | API Routes
 |--------------------------------------------------------------------------
-|
-| Here is where you can register API routes for your application. These
-| routes are loaded by the RouteServiceProvider within a group which
-| is assigned the "api" middleware group. Enjoy building your API!
-|
 */
 
 // ============================================================================
@@ -136,11 +133,11 @@ Route::prefix('v1')->group(function () {
         // Full observer pattern management for administrators only
 
         Route::prefix('observers')->name('api.observers.')->group(function () {
-            
+
             // ================================================================
             // *CORE OBSERVER MANAGEMENT - Jayvian Lazarus Jerome*
             // ================================================================
-            
+
             // Get all available observers
             Route::get('/', [ObserverApiController::class, 'index'])
                 ->middleware('throttle:60,1')
@@ -169,7 +166,7 @@ Route::prefix('v1')->group(function () {
             // ================================================================
             // *SUBJECT MANAGEMENT - Observer Pattern*
             // ================================================================
-            
+
             // Get all subjects with their observers
             Route::get('/subjects', [ObserverApiController::class, 'getSubjects'])
                 ->middleware('throttle:60,1')
@@ -183,7 +180,7 @@ Route::prefix('v1')->group(function () {
             // ================================================================
             // *EVENT MANAGEMENT & TESTING - Observer Pattern*
             // ================================================================
-            
+
             // Manually trigger events for testing
             Route::post('/events/trigger', [ObserverApiController::class, 'triggerEvent'])
                 ->middleware('throttle:observer-event-trigger')
@@ -303,7 +300,7 @@ Route::middleware('auth:sanctum')->group(function () {
             try {
                 $observerService = app(\App\Services\ObserverService::class);
                 $subjects = $observerService->getAllSubjects();
-                
+
                 return response()->json([
                     'success' => true,
                     'message' => 'Observer system status retrieved successfully',
@@ -391,12 +388,6 @@ Route::middleware('auth:sanctum')->group(function () {
 // *RATE LIMITING CONFIGURATION*
 // ============================================================================
 // Define custom rate limits in AppServiceProvider
-
-// booking-creation: 5 requests per minute per user
-// booking-status-update: 10 requests per minute per user
-// booking-state-change: 15 requests per minute per user
-// booking-cancellation: 3 requests per minute per user
-
 // Observer Module (Observer Pattern) - Jayvian Lazarus Jerome:
 // observer-management: 20 requests per minute per admin
 // observer-bulk-operations: 5 requests per minute per admin
