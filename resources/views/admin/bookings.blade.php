@@ -6,7 +6,7 @@
     <style>
         body {
             font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #dc3545 0%, #6f42c1 50%, #fd7e14 100%);
+            background: rgba(255, 255, 255, 0.95);
             min-height: 100vh;
         }
 
