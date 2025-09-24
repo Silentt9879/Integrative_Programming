@@ -15,16 +15,6 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * VehicleApiController - RESTful API Controller for Vehicle Management
- *
- * Provides comprehensive API endpoints for vehicle operations including:
- * - CRUD operations with proper HTTP status codes
- * - Resource transformation for consistent API responses
- * - Integration with VehicleService for business logic separation
- * - Factory Method Pattern implementation through service layer
- * - Error handling and validation
- *
- * Implements RESTful API best practices and Web Services requirements
- * as specified in the assignment rubrics.
  */
 class VehicleApiController extends Controller
 {
@@ -42,7 +32,7 @@ class VehicleApiController extends Controller
     }
 
     /**
-     * Display a listing of vehicles with filtering and pagination
+     * Display a listing of vehicles with filtering and pagination -Vehicle Information Service
      */
     public function index(Request $request): JsonResponse
     {
@@ -77,17 +67,6 @@ class VehicleApiController extends Controller
 
     /**
      * Get available vehicles only
-     *
-     * @param Request $request
-     * @return JsonResponse
-     *
-     * @OA\Get(
-     *     path="/api/vehicles/available",
-     *     summary="Get available vehicles only",
-     *     tags={"Vehicles"},
-     *     @OA\Parameter(name="limit", in="query", description="Limit number of results"),
-     *     @OA\Response(response=200, description="Successful operation")
-     * )
      */
     public function available(Request $request): JsonResponse
     {
@@ -112,19 +91,6 @@ class VehicleApiController extends Controller
 
     /**
      * Store a newly created vehicle using Factory Method Pattern
-     *
-     * @param StoreVehicleRequest $request
-     * @return JsonResponse
-     *
-     * @OA\Post(
-     *     path="/api/vehicles",
-     *     summary="Create a new vehicle",
-     *     tags={"Vehicles"},
-     *     @OA\RequestBody(required=true, description="Vehicle data"),
-     *     @OA\Response(response=201, description="Vehicle created successfully"),
-     *     @OA\Response(response=422, description="Validation error"),
-     *     @OA\Response(response=500, description="Server error")
-     * )
      */
     public function store(StoreVehicleRequest $request): JsonResponse
     {
@@ -153,18 +119,6 @@ class VehicleApiController extends Controller
 
     /**
      * Display the specified vehicle
-     *
-     * @param int $id
-     * @return JsonResponse
-     *
-     * @OA\Get(
-     *     path="/api/vehicles/{id}",
-     *     summary="Get vehicle by ID",
-     *     tags={"Vehicles"},
-     *     @OA\Parameter(name="id", in="path", required=true, description="Vehicle ID"),
-     *     @OA\Response(response=200, description="Successful operation"),
-     *     @OA\Response(response=404, description="Vehicle not found")
-     * )
      */
     public function show(int $id): JsonResponse
     {
@@ -189,21 +143,6 @@ class VehicleApiController extends Controller
 
     /**
      * Update the specified vehicle using Factory Method Pattern
-     *
-     * @param UpdateVehicleRequest $request
-     * @param int $id
-     * @return JsonResponse
-     *
-     * @OA\Put(
-     *     path="/api/vehicles/{id}",
-     *     summary="Update vehicle by ID",
-     *     tags={"Vehicles"},
-     *     @OA\Parameter(name="id", in="path", required=true, description="Vehicle ID"),
-     *     @OA\RequestBody(required=true, description="Updated vehicle data"),
-     *     @OA\Response(response=200, description="Vehicle updated successfully"),
-     *     @OA\Response(response=404, description="Vehicle not found"),
-     *     @OA\Response(response=422, description="Validation error")
-     * )
      */
     public function update(UpdateVehicleRequest $request, int $id): JsonResponse
     {
@@ -232,19 +171,6 @@ class VehicleApiController extends Controller
 
     /**
      * Remove the specified vehicle from storage
-     *
-     * @param int $id
-     * @return JsonResponse
-     *
-     * @OA\Delete(
-     *     path="/api/vehicles/{id}",
-     *     summary="Delete vehicle by ID",
-     *     tags={"Vehicles"},
-     *     @OA\Parameter(name="id", in="path", required=true, description="Vehicle ID"),
-     *     @OA\Response(response=200, description="Vehicle deleted successfully"),
-     *     @OA\Response(response=404, description="Vehicle not found"),
-     *     @OA\Response(response=409, description="Vehicle has active bookings")
-     * )
      */
     public function destroy(int $id): JsonResponse
     {
@@ -270,18 +196,6 @@ class VehicleApiController extends Controller
 
     /**
      * Toggle vehicle status (available/maintenance)
-     *
-     * @param int $id
-     * @return JsonResponse
-     *
-     * @OA\Patch(
-     *     path="/api/vehicles/{id}/toggle-status",
-     *     summary="Toggle vehicle availability status",
-     *     tags={"Vehicles"},
-     *     @OA\Parameter(name="id", in="path", required=true, description="Vehicle ID"),
-     *     @OA\Response(response=200, description="Status updated successfully"),
-     *     @OA\Response(response=404, description="Vehicle not found")
-     * )
      */
     public function toggleStatus(int $id): JsonResponse
     {
@@ -303,19 +217,8 @@ class VehicleApiController extends Controller
     }
 
     /**
-     * Get vehicle type defaults using Factory Method Pattern
-     *
-     * @param string $type
-     * @return JsonResponse
-     *
-     * @OA\Get(
-     *     path="/api/vehicles/types/{type}/defaults",
-     *     summary="Get default values for specific vehicle type",
-     *     tags={"Vehicles"},
-     *     @OA\Parameter(name="type", in="path", required=true, description="Vehicle type"),
-     *     @OA\Response(response=200, description="Defaults retrieved successfully"),
-     *     @OA\Response(response=400, description="Unsupported vehicle type")
-     * )
+     * Get vehicle type defaults use factory pattern get default
+     * - Vehicle Type Defaults Service 3
      */
     public function getTypeDefaults(string $type): JsonResponse
     {
@@ -338,15 +241,6 @@ class VehicleApiController extends Controller
 
     /**
      * Get supported vehicle types
-     *
-     * @return JsonResponse
-     *
-     * @OA\Get(
-     *     path="/api/vehicles/types",
-     *     summary="Get all supported vehicle types",
-     *     tags={"Vehicles"},
-     *     @OA\Response(response=200, description="Vehicle types retrieved successfully")
-     * )
      */
     public function getVehicleTypes(): JsonResponse
     {
@@ -361,7 +255,7 @@ class VehicleApiController extends Controller
     }
 
     /**
-     * Check vehicle availability for specific period
+     * Check vehicle availability for specific period - Vehicle Availability Service 2
      */
     public function checkAvailability(Request $request, int $id): JsonResponse
     {
@@ -398,15 +292,6 @@ class VehicleApiController extends Controller
 
     /**
      * Get vehicle statistics
-     *
-     * @return JsonResponse
-     *
-     * @OA\Get(
-     *     path="/api/vehicles/statistics",
-     *     summary="Get vehicle statistics and analytics",
-     *     tags={"Vehicles"},
-     *     @OA\Response(response=200, description="Statistics retrieved successfully")
-     * )
      */
     public function statistics(): JsonResponse
     {
@@ -442,9 +327,6 @@ class VehicleApiController extends Controller
 
     /**
      * Get applied filters from request
-     *
-     * @param Request $request
-     * @return array
      */
     private function getAppliedFilters(Request $request): array
     {

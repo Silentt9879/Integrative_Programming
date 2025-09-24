@@ -288,7 +288,7 @@ class VehicleController extends Controller
         return $isValidUrl && in_array($scheme, ['http', 'https']);
     }
 
-    //Path Traversal Protection - secure coding practices -XY
+    //Path Traversal Protection - secure coding practices 2 -XY
     private function secureFileDelete(?string $imageUrl): void
     {
         if ($imageUrl && str_starts_with($imageUrl, '/storage/')) {

@@ -376,7 +376,7 @@ class VehicleService
     }
 
     /**
-     * Standard image upload method - used internally by the service
+     * Standard image upload method - used internally by the service - handleImageUpload 1
      *
      * @param \Illuminate\Http\UploadedFile $image
      * @return string
@@ -403,10 +403,7 @@ class VehicleService
 
     /**
      * Validate if uploaded file is a secure image
-     *
-     * @param \Illuminate\Http\UploadedFile $image
-     * @return bool
-     */
+     * */
     private function isSecureImage($image): bool
     {
         // MIME type validation
