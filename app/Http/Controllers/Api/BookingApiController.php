@@ -105,7 +105,7 @@ class BookingApiController extends Controller
             // Data is already validated and sanitized by StoreBookingRequest
             $validatedData = $request->validated();
 
-            // Additional sanitization layer for critical fields (Defense in Depth)
+            // sanitization layer for critical fields
             $sanitizedData = [
                 'vehicle_id' => (int) $validatedData['vehicle_id'],
                 'pickup_date' => $validatedData['pickup_date'],

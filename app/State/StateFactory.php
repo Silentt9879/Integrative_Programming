@@ -43,13 +43,13 @@ class StateFactory
         ];
     }
 
-//state is valid?
+    //state is valid?
     public static function isValidState(string $state): bool
     {
         return in_array($state, self::getAllStates());
     }
 
-   //state workflow description
+   //state workflow descriptions
     public static function getStateWorkflow(): array
     {
         return [

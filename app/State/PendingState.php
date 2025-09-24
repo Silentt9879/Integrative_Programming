@@ -6,7 +6,7 @@ use App\Models\Booking;
 
 class PendingState extends BookingState
 {
-    public function getAvailableActions(): array
+    public function getAvailableActions(): array //pending
     {
         $actions = ['view', 'cancel'];
 
