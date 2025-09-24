@@ -8,6 +8,7 @@ use App\Http\Controllers\Observer\Events\UserLoginEvent;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\View;
 use App\Models\User;
 
 class EmailNotificationObserver implements ObserverInterface
@@ -24,11 +25,11 @@ class EmailNotificationObserver implements ObserverInterface
         try {
             switch (true) {
                 case $eventData instanceof UserRegisteredEvent:
-                    $this->handleCustomerWelcomeEmail($eventData);
+                    $this->handleWelcomeEmail($eventData);
                     break;
                     
                 case $eventData instanceof UserLoginEvent:
-                    $this->handleCustomerLoginNotifications($eventData);
+                    $this->handleSecurityNotifications($eventData);
                     break;
                     
                 case $eventData instanceof BookingStatusChangedEvent:
@@ -40,73 +41,77 @@ class EmailNotificationObserver implements ObserverInterface
             }
         } catch (\Exception $e) {
             Log::error("EmailNotificationObserver failed: " . $e->getMessage());
+            // Store failed email attempt
+            $this->logFailedEmail($eventData, $e->getMessage());
         }
     }
 
     /**
-     * Send welcome email to new customers
+     * Send welcome email to new customers with actual email delivery
      */
-    private function handleCustomerWelcomeEmail(UserRegisteredEvent $event): void
+    private function handleWelcomeEmail(UserRegisteredEvent $event): void
     {
         $user = $event->getUser();
         $registrationData = $event->getRegistrationData();
         
         try {
-            // Queue welcome email
+            // Prepare email data
             $emailData = [
                 'customer_name' => $user->name,
                 'customer_email' => $user->email,
                 'registration_date' => $event->getTimestamp()->format('M d, Y'),
                 'has_complete_profile' => $this->hasCompleteProfile($user),
-                'next_steps' => $this->getCustomerNextSteps($user)
+                'next_steps' => $this->getCustomerNextSteps($user),
+                'login_url' => route('login'),
+                'support_email' => config('mail.support_address', 'support@rentwheels.com')
             ];
 
-            // Send welcome email
-            $this->sendCustomerEmail($user->email, 'welcome', $emailData);
+            // Send actual welcome email
+            $this->sendWelcomeEmail($user, $emailData);
             
-            // Send admin notification email if customer needs approval
+            // Send admin notification if customer needs approval
             if ($this->requiresApproval($user)) {
                 $this->sendAdminNewCustomerEmail($user, $registrationData);
             }
 
-            // Log email activity (only if user has a valid ID)
-            if ($user->id) {
-                $this->logEmailActivity($user->id, 'welcome_email_sent', $emailData);
-            }
+            // Log successful email
+            $this->logEmailActivity($user->id, 'welcome_email_sent', $emailData);
             
-            Log::info("Welcome email sent to new customer: {$user->email}");
+            Log::info("Welcome email sent successfully to: {$user->email}");
             
         } catch (\Exception $e) {
             Log::error("Failed to send welcome email to {$user->email}: " . $e->getMessage());
+            $this->logFailedEmail($event, $e->getMessage());
         }
     }
 
     /**
-     * Handle login-related email notifications
+     * Handle security notifications for suspicious logins
      */
-    private function handleCustomerLoginNotifications(UserLoginEvent $event): void
+    private function handleSecurityNotifications(UserLoginEvent $event): void
     {
         $user = $event->getUser();
         $loginData = $event->getLoginData();
+        $ipAddress = $event->getIpAddress();
         
         try {
-            // Check if it's been a while since last login
+            // Check for security concerns
+            if ($this->isSuspiciousLogin($user, $ipAddress, $loginData)) {
+                $this->sendSecurityAlertEmail($user, $ipAddress, $loginData);
+            }
+
+            // Check if it's a returning customer after long absence
             if ($this->isReturningCustomer($user)) {
                 $this->sendWelcomeBackEmail($user, $loginData);
             }
 
-            // Check for security concerns
-            if ($this->shouldSendSecurityAlert($user, $event->getIpAddress())) {
-                $this->sendSecurityAlertEmail($user, $event->getIpAddress(), $loginData);
-            }
-
         } catch (\Exception $e) {
-            Log::error("Failed to handle login notifications for {$user->email}: " . $e->getMessage());
+            Log::error("Failed to handle security notifications for {$user->email}: " . $e->getMessage());
         }
     }
 
     /**
-     * Handle booking status change emails
+     * Handle booking status change emails with comprehensive notifications
      */
     private function handleBookingStatusEmails(BookingStatusChangedEvent $event): void
     {
@@ -117,178 +122,119 @@ class EmailNotificationObserver implements ObserverInterface
             $emailData = [
                 'customer_name' => $booking->user->name,
                 'booking_id' => $booking->id,
-                'vehicle_name' => $booking->vehicle->name ?? 'Vehicle',
+                'booking_number' => '#BK' . str_pad($booking->id, 4, '0', STR_PAD_LEFT),
+                'vehicle_name' => $booking->vehicle->make . ' ' . $booking->vehicle->model,
+                'vehicle_plate' => $booking->vehicle->license_plate,
                 'old_status' => $event->getOldStatus(),
                 'new_status' => $event->getNewStatus(),
                 'change_date' => $event->getTimestamp()->format('M d, Y H:i'),
                 'booking_details' => $this->getBookingDetails($booking),
-                'next_actions' => $this->getCustomerNextActions($event->getNewStatus())
+                'next_actions' => $this->getCustomerNextActions($event->getNewStatus()),
+                'support_phone' => config('app.support_phone', '+60-123-456-789'),
+                'support_email' => config('mail.support_address', 'support@rentwheels.com')
             ];
 
             // Send customer notification
-            $this->sendCustomerEmail(
-                $booking->user->email, 
-                'booking_status_changed', 
-                $emailData
-            );
+            $this->sendBookingStatusEmail($booking->user, $emailData);
 
             // Send admin email for important changes
             if ($this->shouldNotifyAdmins($event->getNewStatus())) {
                 $this->sendAdminBookingUpdateEmail($booking, $event, $emailData);
             }
 
-            // Log email activity (only if user has a valid ID)
-            if ($booking->user_id) {
-                $this->logEmailActivity($booking->user_id, 'booking_status_email_sent', $emailData);
-            }
+            // Log email activity
+            $this->logEmailActivity($booking->user_id, 'booking_status_email_sent', $emailData);
             
             Log::info("Booking status email sent to {$booking->user->email} for booking #{$booking->id}");
             
         } catch (\Exception $e) {
             Log::error("Failed to send booking status email: " . $e->getMessage());
+            $this->logFailedEmail($event, $e->getMessage());
         }
     }
 
     /**
-     * Send customer email using template system
+     * Actually send welcome email using Laravel Mail
      */
-    private function sendCustomerEmail(string $email, string $template, array $data): void
+    private function sendWelcomeEmail(User $user, array $emailData): void
     {
-        try {
-            // In a real implementation, you would use Laravel's Mail facade with proper email templates
-            // For now, we'll simulate email sending and log the details
-            
-            $emailContent = $this->buildEmailContent($template, $data);
-            
-            // Store email in database for tracking
-            DB::table('email_logs')->insert([
-                'recipient_email' => $email,
-                'template' => $template,
-                'subject' => $emailContent['subject'],
-                'content' => $emailContent['content'],
-                'data' => json_encode($data),
-                'status' => 'sent',
-                'sent_at' => now(),
-                'created_at' => now()
-            ]);
+        Mail::send('emails.customer.welcome', $emailData, function ($message) use ($user, $emailData) {
+            $message->to($user->email, $user->name)
+                   ->subject('Welcome to RentWheels - Your Account is Ready!')
+                   ->from(config('mail.from.address'), config('mail.from.name'));
+        });
 
-            Log::info("Email sent: {$template} to {$email}", ['subject' => $emailContent['subject']]);
-            
-        } catch (\Exception $e) {
-            // Log failed email
-            DB::table('email_logs')->insert([
-                'recipient_email' => $email,
-                'template' => $template,
-                'data' => json_encode($data),
-                'status' => 'failed',
-                'error_message' => $e->getMessage(),
-                'created_at' => now()
-            ]);
-            
-            throw $e;
-        }
+        // Log successful send
+        $this->logEmailSent($user->email, 'welcome', 'Welcome to RentWheels - Your Account is Ready!', $emailData);
     }
 
     /**
-     * Build email content based on template
+     * Send booking status change email
      */
-    private function buildEmailContent(string $template, array $data): array
+    private function sendBookingStatusEmail(User $user, array $emailData): void
     {
-        return match($template) {
-            'welcome' => [
-                'subject' => 'Welcome to RentWheels, ' . $data['customer_name'] . '!',
-                'content' => $this->buildWelcomeEmailContent($data)
-            ],
-            'welcome_back' => [
-                'subject' => 'Welcome back to RentWheels!',
-                'content' => $this->buildWelcomeBackEmailContent($data)
-            ],
-            'booking_status_changed' => [
-                'subject' => 'Booking Update - #' . $data['booking_id'],
-                'content' => $this->buildBookingStatusEmailContent($data)
-            ],
-            'security_alert' => [
-                'subject' => 'Security Alert - New login detected',
-                'content' => $this->buildSecurityAlertEmailContent($data)
-            ],
-            default => [
-                'subject' => 'RentWheels Notification',
-                'content' => 'Thank you for using RentWheels.'
-            ]
-        };
+        $subject = $this->getBookingStatusEmailSubject($emailData['new_status'], $emailData['booking_number']);
+        
+        Mail::send('emails.customer.booking-status', $emailData, function ($message) use ($user, $subject) {
+            $message->to($user->email, $user->name)
+                   ->subject($subject)
+                   ->from(config('mail.from.address'), config('mail.from.name'));
+        });
+
+        // Log successful send
+        $this->logEmailSent($user->email, 'booking_status_changed', $subject, $emailData);
     }
 
     /**
-     * Build welcome email content
+     * Send security alert email for suspicious activity
      */
-    private function buildWelcomeEmailContent(array $data): string
+    private function sendSecurityAlertEmail(User $user, string $ipAddress, array $loginData): void
     {
-        $content = "Dear {$data['customer_name']},\n\n";
-        $content .= "Welcome to RentWheels! We're excited to have you as a customer.\n\n";
-        
-        if (!$data['has_complete_profile']) {
-            $content .= "To get started, please complete your profile by adding:\n";
-            $content .= "- Phone number\n";
-            $content .= "- Date of birth\n";
-            $content .= "- Address\n\n";
-        }
-        
-        $content .= "Next steps:\n";
-        foreach ($data['next_steps'] as $step) {
-            $content .= "- {$step}\n";
-        }
-        
-        $content .= "\nBest regards,\nThe RentWheels Team";
-        
-        return $content;
+        $emailData = [
+            'customer_name' => $user->name,
+            'ip_address' => $ipAddress,
+            'login_time' => now()->format('M d, Y H:i'),
+            'user_agent' => $loginData['user_agent'] ?? 'Unknown',
+            'location' => $this->getLocationFromIP($ipAddress),
+            'account_url' => route('dashboard'),
+            'support_email' => config('mail.from.address', 'rentwheelsnoreply@gmail.com')
+        ];
+
+        Mail::send('emails.security.suspicious-login', $emailData, function ($message) use ($user) {
+            $message->to($user->email, $user->name)
+                   ->subject('RentWheels Security Alert - New Login Detected')
+                   ->from(config('mail.from.address'), config('mail.from.name'));
+        });
+
+        // Log security email
+        $this->logEmailSent($user->email, 'security_alert', 'Security Alert - New Login Detected', $emailData);
     }
 
     /**
-     * Build welcome back email content
+     * Send welcome back email for returning customers
      */
-    private function buildWelcomeBackEmailContent(array $data): string
+    private function sendWelcomeBackEmail(User $user, array $loginData): void
     {
-        return "Dear {$data['customer_name']},\n\n" .
-               "Welcome back to RentWheels! We're glad to see you again.\n\n" .
-               "Check out our latest vehicles and special offers.\n\n" .
-               "Best regards,\nThe RentWheels Team";
+        $emailData = [
+            'customer_name' => $user->name,
+            'last_login' => $user->last_login_at ? $user->last_login_at->format('M d, Y') : 'a while ago',
+            'special_offers' => $this->getSpecialOffers(),
+            'browse_url' => route('vehicles.index'),
+            'dashboard_url' => route('dashboard')
+        ];
+
+        Mail::send('emails.customer.welcome-back', $emailData, function ($message) use ($user) {
+            $message->to($user->email, $user->name)
+                   ->subject('Welcome Back to RentWheels!')
+                   ->from(config('mail.from.address'), config('mail.from.name'));
+        });
+
+        // Log welcome back email
+        $this->logEmailSent($user->email, 'welcome_back', 'Welcome Back to RentWheels!', $emailData);
     }
 
     /**
-     * Build booking status email content
-     */
-    private function buildBookingStatusEmailContent(array $data): string
-    {
-        $content = "Dear {$data['customer_name']},\n\n";
-        $content .= "Your booking #{$data['booking_id']} for {$data['vehicle_name']} has been updated.\n\n";
-        $content .= "Status changed from '{$data['old_status']}' to '{$data['new_status']}' on {$data['change_date']}.\n\n";
-        
-        if (!empty($data['next_actions'])) {
-            $content .= "Next actions:\n";
-            foreach ($data['next_actions'] as $action) {
-                $content .= "- {$action}\n";
-            }
-            $content .= "\n";
-        }
-        
-        $content .= "Best regards,\nThe RentWheels Team";
-        
-        return $content;
-    }
-
-    /**
-     * Build security alert email content
-     */
-    private function buildSecurityAlertEmailContent(array $data): string
-    {
-        return "Dear {$data['customer_name']},\n\n" .
-               "We detected a new login to your RentWheels account from IP: {$data['ip_address']}\n\n" .
-               "If this was you, no action is needed. If you didn't login, please contact support immediately.\n\n" .
-               "Best regards,\nThe RentWheels Security Team";
-    }
-
-    /**
-     * Send admin notification email for new customer
+     * Send admin notification for new customer requiring approval
      */
     private function sendAdminNewCustomerEmail(User $customer, array $registrationData): void
     {
@@ -299,16 +245,24 @@ class EmailNotificationObserver implements ObserverInterface
                 'customer_name' => $customer->name,
                 'customer_email' => $customer->email,
                 'registration_date' => now()->format('M d, Y H:i'),
-                'requires_approval' => true,
-                'profile_complete' => $this->hasCompleteProfile($customer)
+                'profile_complete' => $this->hasCompleteProfile($customer),
+                'registration_ip' => $registrationData['registration_ip'] ?? 'Unknown',
+                'admin_panel_url' => route('admin.customers'),
+                'customer_id' => $customer->id
             ];
             
-            $this->sendAdminEmail($adminEmail, 'new_customer_approval_needed', $emailData);
+            Mail::send('emails.admin.new-customer-approval', $emailData, function ($message) use ($adminEmail, $customer) {
+                $message->to($adminEmail)
+                       ->subject('New Customer Requires Approval - ' . $customer->name)
+                       ->from(config('mail.from.address'), config('mail.from.name'));
+            });
         }
+
+        Log::info("Admin notification sent for new customer: {$customer->email}");
     }
 
     /**
-     * Send admin email for booking updates
+     * Send admin notification for booking updates
      */
     private function sendAdminBookingUpdateEmail($booking, $event, array $emailData): void
     {
@@ -316,168 +270,153 @@ class EmailNotificationObserver implements ObserverInterface
         
         foreach ($adminEmails as $adminEmail) {
             $adminEmailData = array_merge($emailData, [
-                'requires_action' => in_array($event->getNewStatus(), ['cancelled', 'active'])
+                'requires_action' => in_array($event->getNewStatus(), ['cancelled', 'active']),
+                'admin_panel_url' => route('admin.bookings'),
+                'booking_id' => $booking->id
             ]);
             
-            $this->sendAdminEmail($adminEmail, 'booking_status_admin_notification', $adminEmailData);
+            $subject = 'Booking Update Requires Attention - ' . $emailData['booking_number'];
+            
+            Mail::send('emails.admin.booking-update', $adminEmailData, function ($message) use ($adminEmail, $subject) {
+                $message->to($adminEmail)
+                       ->subject($subject)
+                       ->from(config('mail.from.address'), config('mail.from.name'));
+            });
         }
     }
 
     /**
-     * Send admin email
+     * Log successful email sends to database
      */
-    private function sendAdminEmail(string $email, string $template, array $data): void
+    private function logEmailSent(string $email, string $template, string $subject, array $data): void
     {
-        // Similar to customer email but with admin-specific templates
-        $this->sendCustomerEmail($email, $template, $data);
-    }
-
-    /**
-     * Log email activity
-     */
-    private function logEmailActivity(?int $userId, string $activity, array $data): void
-    {
-        // Skip logging if no valid user ID
-        if (!$userId) {
-            return;
-        }
-        
         try {
-            DB::table('customer_email_activities')->insert([
-                'user_id' => $userId,
-                'activity_type' => $activity,
-                'email_template' => $data['template'] ?? null,
-                'metadata' => json_encode($data),
+            DB::table('email_logs')->insert([
+                'recipient_email' => $email,
+                'template' => $template,
+                'subject' => $subject,
+                'content' => 'Email sent successfully via Mail facade',
+                'data' => json_encode($data),
+                'status' => 'sent',
+                'sent_at' => now(),
                 'created_at' => now()
             ]);
         } catch (\Exception $e) {
-            Log::error("Failed to log email activity: " . $e->getMessage());
+            Log::error("Failed to log email send: " . $e->getMessage());
         }
     }
 
     /**
-     * Check if customer has complete profile
+     * Log failed email attempts
      */
+    private function logFailedEmail($event, string $error): void
+    {
+        try {
+            DB::table('email_logs')->insert([
+                'recipient_email' => 'unknown',
+                'template' => 'failed_event',
+                'subject' => 'Failed Email Processing',
+                'content' => 'Email processing failed',
+                'data' => json_encode(['event' => get_class($event), 'error' => $error]),
+                'status' => 'failed',
+                'error_message' => $error,
+                'created_at' => now()
+            ]);
+        } catch (\Exception $e) {
+            Log::error("Failed to log failed email: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Helper method to determine appropriate email subject for booking status
+     */
+    private function getBookingStatusEmailSubject(string $status, string $bookingNumber): string
+    {
+        return match($status) {
+            'confirmed' => "Booking Confirmed - $bookingNumber",
+            'active' => "Vehicle Ready for Pickup - $bookingNumber", 
+            'completed' => "Thank You for Choosing RentWheels - $bookingNumber",
+            'cancelled' => "Booking Cancelled - $bookingNumber",
+            default => "Booking Update - $bookingNumber"
+        };
+    }
+
+    // Helper methods (existing functionality enhanced)
     private function hasCompleteProfile(User $user): bool
     {
         return !empty($user->phone) && !empty($user->date_of_birth) && !empty($user->address);
     }
 
-    /**
-     * Check if customer requires approval
-     */
     private function requiresApproval(User $user): bool
     {
         return !$this->hasCompleteProfile($user);
     }
 
-    /**
-     * Get customer next steps
-     */
     private function getCustomerNextSteps(User $user): array
     {
-        $steps = [];
+        $steps = ['Browse our vehicle catalog', 'Make your first booking'];
         
         if (!$this->hasCompleteProfile($user)) {
-            $steps[] = 'Complete your profile information';
+            array_unshift($steps, 'Complete your profile information');
         }
-        
-        $steps[] = 'Browse our vehicle catalog';
-        $steps[] = 'Make your first booking';
         
         return $steps;
     }
 
-    /**
-     * Check if customer is returning after long absence
-     */
-    private function isReturningCustomer(User $user): bool
+    private function isSuspiciousLogin(User $user, string $ipAddress, array $loginData): bool
     {
-        return $user->last_login_at && 
-               $user->last_login_at->diffInDays(now()) > 30;
+        // Check for multiple failed attempts or new location
+        $recentLogins = DB::table('security_logs')
+            ->where('customer_id', $user->id)
+            ->where('created_at', '>=', now()->subHours(24))
+            ->count();
+            
+        return $recentLogins > 5 || $this->isNewLocation($user, $ipAddress);
     }
 
-    /**
-     * Check if security alert should be sent
-     */
-    private function shouldSendSecurityAlert(User $user, string $ipAddress): bool
+    private function isNewLocation(User $user, string $ipAddress): bool
     {
-        // Check if login from new IP address
-        $recentLogins = DB::table('customer_activities')
-            ->where('user_id', $user->id)
-            ->where('activity_type', 'login')
+        $recentIPs = DB::table('security_logs')
+            ->where('customer_id', $user->id)
             ->where('created_at', '>=', now()->subDays(30))
             ->pluck('ip_address')
             ->unique();
             
-        return !$recentLogins->contains($ipAddress);
+        return !$recentIPs->contains($ipAddress);
     }
 
-    /**
-     * Send welcome back email
-     */
-    private function sendWelcomeBackEmail(User $user, array $loginData): void
+    private function isReturningCustomer(User $user): bool
     {
-        $emailData = [
-            'customer_name' => $user->name,
-            'last_login' => $user->last_login_at->format('M d, Y')
-        ];
-        
-        $this->sendCustomerEmail($user->email, 'welcome_back', $emailData);
+        return $user->last_login_at && $user->last_login_at->diffInDays(now()) > 30;
     }
 
-    /**
-     * Send security alert email
-     */
-    private function sendSecurityAlertEmail(User $user, string $ipAddress, array $loginData): void
-    {
-        $emailData = [
-            'customer_name' => $user->name,
-            'ip_address' => $ipAddress,
-            'login_time' => now()->format('M d, Y H:i')
-        ];
-        
-        $this->sendCustomerEmail($user->email, 'security_alert', $emailData);
-    }
-
-    /**
-     * Get booking details
-     */
     private function getBookingDetails($booking): array
     {
         return [
-            'vehicle_name' => $booking->vehicle->name ?? 'Vehicle',
-            'start_date' => $booking->start_date ?? 'TBD',
-            'end_date' => $booking->end_date ?? 'TBD',
-            'total_amount' => $booking->total_amount ?? 0
+            'pickup_date' => $booking->pickup_datetime ? $booking->pickup_datetime->format('M d, Y H:i') : 'TBD',
+            'return_date' => $booking->return_datetime ? $booking->return_datetime->format('M d, Y H:i') : 'TBD',
+            'total_amount' => $booking->total_amount ?? 0,
+            'pickup_location' => $booking->pickup_location ?? 'Main Office',
+            'return_location' => $booking->return_location ?? 'Main Office'
         ];
     }
 
-    /**
-     * Get customer next actions based on booking status
-     */
     private function getCustomerNextActions(string $status): array
     {
         return match($status) {
             'confirmed' => ['Prepare required documents', 'Arrive at pickup location on time'],
             'active' => ['Enjoy your rental', 'Contact us if you need assistance'],
             'completed' => ['Rate your experience', 'Book again anytime'],
-            'cancelled' => ['Refund will be processed', 'Feel free to book again'],
-            default => []
+            'cancelled' => ['Refund will be processed if applicable', 'Feel free to book again'],
+            default => ['Contact support if you have questions']
         };
     }
 
-    /**
-     * Check if admins should be notified
-     */
     private function shouldNotifyAdmins(string $status): bool
     {
-        return in_array($status, ['cancelled', 'active']);
+        return in_array($status, ['cancelled', 'active', 'confirmed']);
     }
 
-    /**
-     * Get admin emails
-     */
     private function getAdminEmails(): array
     {
         try {
@@ -487,7 +426,41 @@ class EmailNotificationObserver implements ObserverInterface
                 ->toArray();
         } catch (\Exception $e) {
             Log::error("Failed to get admin emails: " . $e->getMessage());
-            return [];
+            return [config('mail.admin_email', 'admin@rentwheels.com')];
         }
+    }
+
+    private function logEmailActivity(?int $userId, string $activity, array $data): void
+    {
+        if (!$userId) return;
+        
+        try {
+            DB::table('customer_email_activities')->insert([
+                'user_id' => $userId,
+                'activity_type' => $activity,
+                'email_template' => $data['template'] ?? null,
+                'metadata' => json_encode($data),
+                'created_at' => now(),
+                'updated_at' => now()
+            ]);
+        } catch (\Exception $e) {
+            Log::error("Failed to log email activity: " . $e->getMessage());
+        }
+    }
+
+    private function getLocationFromIP(string $ipAddress): string
+    {
+        // For production, integrate with a geolocation service
+        // For now, return a placeholder
+        return 'Unknown Location';
+    }
+
+    private function getSpecialOffers(): array
+    {
+        return [
+            'Welcome back discount: 10% off your next booking',
+            'Extended rental deals available',
+            'New luxury vehicles in our fleet'
+        ];
     }
 }

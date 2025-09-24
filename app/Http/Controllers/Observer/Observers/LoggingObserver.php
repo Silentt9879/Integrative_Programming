@@ -2,7 +2,6 @@
 namespace App\Http\Controllers\Observer\Observers;
 
 use App\Http\Controllers\Observer\Contracts\ObserverInterface;
-use App\Http\Controllers\Observer\Events\BaseEvent;
 use App\Http\Controllers\Observer\Events\UserRegisteredEvent;
 use App\Http\Controllers\Observer\Events\UserLoginEvent;
 use App\Http\Controllers\Observer\Events\BookingStatusChangedEvent;
@@ -21,61 +20,58 @@ class LoggingObserver implements ObserverInterface
     public function update($eventData): void
     {
         try {
-            if ($eventData instanceof BaseEvent) {
-                // Create structured audit log entry
-                $this->createAuditLog($eventData);
-                
-                // Handle specific event types for detailed logging
-                switch (true) {
-                    case $eventData instanceof UserRegisteredEvent:
-                        $this->logCustomerRegistration($eventData);
-                        break;
-                        
-                    case $eventData instanceof UserLoginEvent:
-                        $this->logCustomerLogin($eventData);
-                        break;
-                        
-                    case $eventData instanceof BookingStatusChangedEvent:
-                        $this->logBookingStatusChange($eventData);
-                        break;
-                        
-                    case $eventData instanceof ReportGeneratedEvent:
-                        $this->logAdminActivity($eventData);
-                        break;
-                }
-                
-                // Create application log entry
-                $this->createApplicationLog($eventData);
-                
-            } else {
-                Log::warning("LoggingObserver received non-event data", [
-                    'data_type' => gettype($eventData),
-                    'data' => $eventData
-                ]);
+            // Create comprehensive audit log entry first
+            $this->createAuditLog($eventData);
+            
+            // Handle specific event types for detailed logging
+            switch (true) {
+                case $eventData instanceof UserRegisteredEvent:
+                    $this->logUserRegistration($eventData);
+                    break;
+                    
+                case $eventData instanceof UserLoginEvent:
+                    $this->logUserLogin($eventData);
+                    break;
+                    
+                case $eventData instanceof BookingStatusChangedEvent:
+                    $this->logBookingStatusChange($eventData);
+                    break;
+                    
+                case $eventData instanceof ReportGeneratedEvent:
+                    $this->logReportGeneration($eventData);
+                    break;
             }
+            
+            // Log to Laravel's standard log as well
+            $this->logToFile($eventData);
+            
         } catch (\Exception $e) {
-            Log::error("LoggingObserver failed to log event: " . $e->getMessage());
+            Log::error("LoggingObserver failed to log event: " . $e->getMessage(), [
+                'event_type' => get_class($eventData),
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
         }
     }
 
     /**
      * Create comprehensive audit log for compliance and monitoring
      */
-    private function createAuditLog(BaseEvent $event): void
+    private function createAuditLog($event): void
     {
         try {
             $auditData = [
                 'event_id' => $this->generateEventId(),
-                'event_type' => class_basename($event->getEventType()),
+                'event_type' => class_basename(get_class($event)),
                 'event_category' => $this->getEventCategory($event),
-                'timestamp' => $event->getTimestamp()->toISOString(),
+                'timestamp' => now()->toISOString(),
                 'user_id' => $this->extractUserId($event),
                 'admin_id' => $this->getCurrentAdminId(),
                 'ip_address' => request()->ip() ?? 'unknown',
                 'user_agent' => request()->userAgent() ?? 'unknown',
                 'session_id' => session()->getId() ?? null,
-                'metadata' => json_encode($event->getMetadata()),
-                'event_data' => json_encode($event->toArray()),
+                'metadata' => json_encode($event->getMetadata() ?? []),
+                'event_data' => json_encode($event->toArray() ?? []),
                 'severity' => $this->getEventSeverity($event),
                 'compliance_flag' => $this->requiresComplianceReview($event),
                 'created_at' => now(),
@@ -92,16 +88,16 @@ class LoggingObserver implements ObserverInterface
     }
 
     /**
-     * Log customer registration with detailed tracking
+     * Log user registration events
      */
-    private function logCustomerRegistration(UserRegisteredEvent $event): void
+    private function logUserRegistration(UserRegisteredEvent $event): void
     {
         $user = $event->getUser();
         $registrationData = $event->getRegistrationData();
         
         try {
             // Create customer management log
-            $customerLogData = [
+            $logData = [
                 'log_type' => 'customer_registration',
                 'customer_id' => $user->id,
                 'customer_email' => $user->email,
@@ -110,7 +106,7 @@ class LoggingObserver implements ObserverInterface
                 'registration_ip' => $registrationData['registration_ip'] ?? request()->ip(),
                 'profile_completeness' => $this->calculateProfileCompleteness($user),
                 'requires_approval' => $this->requiresApproval($user),
-                'data_protection_consent' => true, // Assume consent given during registration
+                'data_protection_consent' => true,
                 'marketing_consent' => $registrationData['marketing_consent'] ?? false,
                 'metadata' => json_encode([
                     'has_phone' => !empty($user->phone),
@@ -118,39 +114,34 @@ class LoggingObserver implements ObserverInterface
                     'has_date_of_birth' => !empty($user->date_of_birth),
                     'registration_time' => $event->getTimestamp()->toISOString()
                 ]),
-                'created_at' => now()
+                'created_at' => now(),
+                'updated_at' => now()
             ];
 
-            DB::table('customer_management_logs')->insert($customerLogData);
+            DB::table('customer_management_logs')->insert($logData);
             
-            // Create compliance log for GDPR/data protection
-            $this->createComplianceLog([
-                'type' => 'data_collection',
-                'subject_type' => 'customer',
-                'subject_id' => $user->id,
-                'action' => 'personal_data_collected',
-                'legal_basis' => 'legitimate_interest',
-                'data_categories' => $this->getCollectedDataCategories($user),
-                'retention_period' => '7_years',
-                'consent_status' => 'given'
+            // Track customer activity
+            $this->trackCustomerActivity($user->id, 'registration', [
+                'ip_address' => $registrationData['registration_ip'] ?? request()->ip(),
+                'user_agent' => $registrationData['user_agent'] ?? request()->userAgent(),
+                'registration_data' => $registrationData
             ]);
             
             Log::info("CUSTOMER_REGISTRATION_LOGGED", [
                 'customer_id' => $user->id,
                 'customer_email' => $user->email,
-                'registration_source' => $registrationData['source'] ?? 'web',
-                'profile_complete' => $this->calculateProfileCompleteness($user) === 'complete'
+                'registration_source' => $registrationData['source'] ?? 'web'
             ]);
             
         } catch (\Exception $e) {
-            Log::error("Failed to log customer registration: " . $e->getMessage());
+            Log::error("Failed to log user registration: " . $e->getMessage());
         }
     }
 
     /**
-     * Log customer login with security tracking
+     * Log user login events with security tracking
      */
-    private function logCustomerLogin(UserLoginEvent $event): void
+    private function logUserLogin(UserLoginEvent $event): void
     {
         $user = $event->getUser();
         $loginData = $event->getLoginData();
@@ -166,36 +157,37 @@ class LoggingObserver implements ObserverInterface
                 'session_id' => session()->getId(),
                 'remember_me' => $loginData['remember_me'] ?? false,
                 'is_suspicious' => $this->detectSuspiciousActivity($user, $event->getIpAddress()),
-                'location_estimate' => $this->estimateLocation($event->getIpAddress()),
+                'location_estimate' => 'Unknown', // Could integrate with geolocation service
                 'device_fingerprint' => $this->generateDeviceFingerprint($loginData),
                 'previous_login' => $user->last_login_at?->toISOString(),
                 'login_timestamp' => $event->getTimestamp()->toISOString(),
                 'metadata' => json_encode($loginData),
-                'created_at' => now()
+                'created_at' => now(),
+                'updated_at' => now()
             ];
 
             DB::table('security_logs')->insert($securityLogData);
             
             // Track customer activity
-            $this->createCustomerActivityLog($user->id, 'login', [
+            $this->trackCustomerActivity($user->id, 'login', [
                 'ip_address' => $event->getIpAddress(),
                 'session_start' => $event->getTimestamp()->toISOString(),
                 'login_data' => $loginData
             ]);
             
-            Log::info("CUSTOMER_LOGIN_LOGGED", [
+            Log::info("USER_LOGIN_LOGGED", [
                 'customer_id' => $user->id,
                 'ip_address' => $event->getIpAddress(),
                 'is_suspicious' => $securityLogData['is_suspicious']
             ]);
             
         } catch (\Exception $e) {
-            Log::error("Failed to log customer login: " . $e->getMessage());
+            Log::error("Failed to log user login: " . $e->getMessage());
         }
     }
 
     /**
-     * Log booking status changes with business impact tracking
+     * Log booking status changes
      */
     private function logBookingStatusChange(BookingStatusChangedEvent $event): void
     {
@@ -220,19 +212,11 @@ class LoggingObserver implements ObserverInterface
                 'requires_followup' => $this->requiresFollowup($event->getNewStatus()),
                 'change_timestamp' => $event->getTimestamp()->toISOString(),
                 'metadata' => json_encode($changeData),
-                'created_at' => now()
+                'created_at' => now(),
+                'updated_at' => now()
             ];
 
             DB::table('business_operation_logs')->insert($businessLogData);
-            
-            // Create customer interaction log if status affects customer
-            if ($this->affectsCustomer($event->getNewStatus())) {
-                $this->createCustomerInteractionLog($booking->user_id, 'booking_status_updated', [
-                    'booking_id' => $booking->id,
-                    'status_change' => "{$event->getOldStatus()}_to_{$event->getNewStatus()}",
-                    'notification_sent' => true
-                ]);
-            }
             
             Log::info("BOOKING_STATUS_CHANGE_LOGGED", [
                 'booking_id' => $booking->id,
@@ -247,9 +231,9 @@ class LoggingObserver implements ObserverInterface
     }
 
     /**
-     * Log admin activities for management oversight
+     * Log report generation events
      */
-    private function logAdminActivity(ReportGeneratedEvent $event): void
+    private function logReportGeneration(ReportGeneratedEvent $event): void
     {
         $admin = $event->getGeneratedBy();
         $generationData = $event->getGenerationData();
@@ -265,113 +249,63 @@ class LoggingObserver implements ObserverInterface
                 'report_parameters' => json_encode($event->getReportData()),
                 'generation_status' => $generationData['status'] ?? 'unknown',
                 'execution_time' => $this->calculateExecutionTime($generationData),
-                'data_accessed' => $this->getDataAccessedTypes($event->getReportType()),
+                'data_accessed' => json_encode($this->getDataAccessedTypes($event->getReportType())),
                 'export_format' => $generationData['format'] ?? 'pdf',
                 'file_generated' => $generationData['file_generated'] ?? false,
                 'ip_address' => request()->ip(),
                 'session_id' => session()->getId(),
                 'generation_timestamp' => $event->getTimestamp()->toISOString(),
                 'metadata' => json_encode($generationData),
-                'created_at' => now()
+                'created_at' => now(),
+                'updated_at' => now()
             ];
 
             DB::table('admin_activity_logs')->insert($adminLogData);
             
-            // Create compliance log for data access
-            $this->createComplianceLog([
-                'type' => 'data_access',
-                'subject_type' => 'admin',
-                'subject_id' => $admin->id,
-                'action' => 'report_generated',
-                'data_categories' => $this->getReportDataCategories($event->getReportType()),
-                'access_purpose' => 'business_reporting',
-                'legal_basis' => 'legitimate_interest'
-            ]);
-            
-            Log::info("ADMIN_ACTIVITY_LOGGED", [
+            Log::info("REPORT_GENERATION_LOGGED", [
                 'admin_id' => $admin->id,
-                'activity' => 'report_generation',
                 'report_type' => $event->getReportType(),
                 'status' => $generationData['status'] ?? 'unknown'
             ]);
             
         } catch (\Exception $e) {
-            Log::error("Failed to log admin activity: " . $e->getMessage());
+            Log::error("Failed to log report generation: " . $e->getMessage());
         }
     }
 
     /**
-     * Create application log entry with structured format
+     * Log to Laravel's standard logging system
      */
-    private function createApplicationLog(BaseEvent $event): void
+    private function logToFile($event): void
     {
         $logData = [
             'event_class' => get_class($event),
-            'event_type' => class_basename($event->getEventType()),
+            'event_type' => class_basename(get_class($event)),
             'timestamp' => $event->getTimestamp()->toISOString(),
-            'metadata' => $event->getMetadata(),
-            'event_data' => $event->toArray(),
+            'metadata' => $event->getMetadata() ?? [],
             'processing_time' => microtime(true) - ($_SERVER['REQUEST_TIME_FLOAT'] ?? microtime(true))
         ];
 
-        $message = "Event processed: " . class_basename($event->getEventType());
+        $message = "Observer Event: " . class_basename(get_class($event));
         Log::info($message, $logData);
     }
 
     /**
-     * Create compliance log for data protection regulations
+     * Track customer activity in dedicated table
      */
-    private function createComplianceLog(array $complianceData): void
+    private function trackCustomerActivity(int $customerId, string $activity, array $data): void
     {
         try {
-            $complianceLogData = array_merge($complianceData, [
-                'timestamp' => now()->toISOString(),
-                'regulation' => 'GDPR',
-                'created_at' => now()
-            ]);
-
-            DB::table('compliance_logs')->insert($complianceLogData);
-            
-        } catch (\Exception $e) {
-            Log::error("Failed to create compliance log: " . $e->getMessage());
-        }
-    }
-
-    /**
-     * Create customer activity log
-     */
-    private function createCustomerActivityLog(int $customerId, string $activity, array $data): void
-    {
-        try {
-            DB::table('customer_activity_logs')->insert([
-                'customer_id' => $customerId,
+            DB::table('customer_activities')->insert([
+                'user_id' => $customerId,
                 'activity_type' => $activity,
-                'activity_data' => json_encode($data),
-                'ip_address' => request()->ip(),
-                'user_agent' => request()->userAgent(),
-                'session_id' => session()->getId(),
+                'ip_address' => $data['ip_address'] ?? request()->ip(),
+                'user_agent' => $data['user_agent'] ?? request()->userAgent(),
+                'metadata' => json_encode($data),
                 'created_at' => now()
             ]);
         } catch (\Exception $e) {
-            Log::error("Failed to create customer activity log: " . $e->getMessage());
-        }
-    }
-
-    /**
-     * Create customer interaction log
-     */
-    private function createCustomerInteractionLog(int $customerId, string $interaction, array $data): void
-    {
-        try {
-            DB::table('customer_interaction_logs')->insert([
-                'customer_id' => $customerId,
-                'interaction_type' => $interaction,
-                'interaction_data' => json_encode($data),
-                'timestamp' => now()->toISOString(),
-                'created_at' => now()
-            ]);
-        } catch (\Exception $e) {
-            Log::error("Failed to create customer interaction log: " . $e->getMessage());
+            Log::error("Failed to track customer activity: " . $e->getMessage());
         }
     }
 
@@ -383,7 +317,7 @@ class LoggingObserver implements ObserverInterface
         return 'evt_' . uniqid() . '_' . time();
     }
 
-    private function getEventCategory(BaseEvent $event): string
+    private function getEventCategory($event): string
     {
         return match(true) {
             $event instanceof UserRegisteredEvent => 'customer_management',
@@ -394,9 +328,9 @@ class LoggingObserver implements ObserverInterface
         };
     }
 
-    private function extractUserId(BaseEvent $event): ?int
+    private function extractUserId($event): ?int
     {
-        $metadata = $event->getMetadata();
+        $metadata = $event->getMetadata() ?? [];
         return $metadata['user_id'] ?? null;
     }
 
@@ -405,18 +339,15 @@ class LoggingObserver implements ObserverInterface
         return Auth::check() && Auth::user()->is_admin ? Auth::id() : null;
     }
 
-    private function getEventSeverity(BaseEvent $event): string
+    private function getEventSeverity($event): string
     {
         return match(true) {
-            $event instanceof UserRegisteredEvent => 'info',
-            $event instanceof UserLoginEvent => 'info',
             $event instanceof BookingStatusChangedEvent => 'warning',
-            $event instanceof ReportGeneratedEvent => 'info',
             default => 'info'
         };
     }
 
-    private function requiresComplianceReview(BaseEvent $event): bool
+    private function requiresComplianceReview($event): bool
     {
         return $event instanceof UserRegisteredEvent || 
                $event instanceof ReportGeneratedEvent;
@@ -446,17 +377,8 @@ class LoggingObserver implements ObserverInterface
         return $this->calculateProfileCompleteness($user) !== 'complete';
     }
 
-    private function getCollectedDataCategories($user): array
-    {
-        $categories = ['identity', 'contact'];
-        if (!empty($user->date_of_birth)) $categories[] = 'demographic';
-        if (!empty($user->address)) $categories[] = 'location';
-        return $categories;
-    }
-
     private function detectSuspiciousActivity($user, string $ipAddress): bool
     {
-        // Simplified suspicious activity detection
         try {
             $recentLogins = DB::table('security_logs')
                 ->where('customer_id', $user->id)
@@ -467,12 +389,6 @@ class LoggingObserver implements ObserverInterface
         } catch (\Exception $e) {
             return false;
         }
-    }
-
-    private function estimateLocation(string $ipAddress): string
-    {
-        // Simplified location estimation - use proper geolocation service in production
-        return 'Unknown';
     }
 
     private function generateDeviceFingerprint(array $loginData): string
@@ -494,9 +410,7 @@ class LoggingObserver implements ObserverInterface
     private function assessCustomerImpact(string $status): string
     {
         return match($status) {
-            'confirmed' => 'positive',
-            'active' => 'positive',
-            'completed' => 'positive',
+            'confirmed', 'active', 'completed' => 'positive',
             'cancelled' => 'negative',
             default => 'neutral'
         };
@@ -507,16 +421,11 @@ class LoggingObserver implements ObserverInterface
         return in_array($status, ['cancelled', 'active']);
     }
 
-    private function affectsCustomer(string $status): bool
-    {
-        return in_array($status, ['confirmed', 'active', 'completed', 'cancelled']);
-    }
-
     private function calculateExecutionTime(array $generationData): ?float
     {
         if (isset($generationData['generation_start']) && isset($generationData['generation_completed'])) {
-            $start = Carbon::parse($generationData['generation_start']);
-            $end = Carbon::parse($generationData['generation_completed']);
+            $start = \Carbon\Carbon::parse($generationData['generation_start']);
+            $end = \Carbon\Carbon::parse($generationData['generation_completed']);
             return $start->diffInSeconds($end);
         }
         return null;
@@ -529,16 +438,6 @@ class LoggingObserver implements ObserverInterface
             'customer_report' => ['users', 'bookings'],
             'financial_report' => ['bookings', 'revenue', 'vehicles'],
             default => ['general']
-        };
-    }
-
-    private function getReportDataCategories(string $reportType): array
-    {
-        return match($reportType) {
-            'overview' => ['business_data', 'financial_data'],
-            'customer_report' => ['personal_data', 'business_data'],
-            'financial_report' => ['financial_data', 'business_data'],
-            default => ['business_data']
         };
     }
 }

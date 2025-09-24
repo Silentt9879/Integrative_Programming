@@ -275,6 +275,13 @@
                         </a>
                     </li>
                     <li class="nav-item admin-nav-item">
+                        <a class="nav-link {{ request()->routeIs('admin.notifications*') ? 'active' : '' }}" 
+                           href="{{ route('admin.notifications.index') }}" id="navbar-notifications-link">
+                            <i class="fas fa-bell me-1"></i>Notifications
+                            <span class="badge bg-danger ms-1" id="navbar-notification-badge" style="display: none;">0</span>
+                        </a>
+                    </li>
+                    <li class="nav-item admin-nav-item">
                         <form method="POST" action="{{ route('admin.logout') }}" class="logout-form d-inline">
                             @csrf
                             <button class="logout-btn" type="submit">
@@ -528,6 +535,82 @@
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        // Load notification count on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadNotificationCount();
+            
+            // Auto-refresh notification count every 30 seconds
+            setInterval(loadNotificationCount, 30000);
+        });
+
+        function loadNotificationCount() {
+            fetch('/admin/notifications/stats', {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                const badge = document.getElementById('navbar-notification-badge');
+                if (data.unread_total > 0) {
+                    badge.textContent = data.unread_total > 99 ? '99+' : data.unread_total;
+                    badge.style.display = 'inline';
+                    
+                    // Add pulse animation for new notifications
+                    badge.classList.add('notification-pulse');
+                    setTimeout(() => {
+                        badge.classList.remove('notification-pulse');
+                    }, 1000);
+                } else {
+                    badge.style.display = 'none';
+                }
+            })
+            .catch(error => {
+                console.error('Error loading notification count:', error);
+            });
+        }
+    </script>
+
+    <style>
+        /* Notification badge styling */
+        #navbar-notification-badge {
+            font-size: 0.7rem;
+            padding: 0.2em 0.5em;
+            border-radius: 10px;
+            min-width: 18px;
+            text-align: center;
+        }
+
+        /* Pulse animation for new notifications */
+        @keyframes notificationPulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+
+        .notification-pulse {
+            animation: notificationPulse 0.6s ease-in-out;
+        }
+
+        /* Bell icon animation on hover */
+        .admin-nav-item .nav-link:hover .fa-bell {
+            animation: bellSwing 0.8s ease-in-out;
+        }
+
+        @keyframes bellSwing {
+            15% { transform: rotate(10deg); }
+            30% { transform: rotate(-10deg); }
+            50% { transform: rotate(6deg); }
+            65% { transform: rotate(-6deg); }
+            80% { transform: rotate(3deg); }
+            100% { transform: rotate(0deg); }
+        }
+    </style>
 </body>
 
 </html>

@@ -19,12 +19,28 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Barryvdh\DomPDF\Facade\Pdf;
 
+// Observer Pattern - JAYVIAN 
+use App\Http\Controllers\Observer\Subjects\BookingSubject;
+use App\Http\Controllers\Observer\Observers\EmailNotificationObserver;
+use App\Http\Controllers\Observer\Observers\LoggingObserver;
+use App\Http\Controllers\Observer\Observers\AdminNotificationObserver;
+
 class AdminController extends Controller
 {
 
-    /**
-     * Show admin login form
-     */
+    private BookingSubject $bookingSubject;
+
+    public function __construct()
+    {
+        // Initialize Observer Pattern
+        $this->bookingSubject = new BookingSubject();
+        
+        // Attach observers
+        $this->bookingSubject->attach(new EmailNotificationObserver());
+        $this->bookingSubject->attach(new LoggingObserver());
+        $this->bookingSubject->attach(new AdminNotificationObserver());
+    }
+
     public function showLogin()
     {
         // Additional check: If user is already logged in
@@ -794,131 +810,132 @@ class AdminController extends Controller
     }
 
     //Update booking status - Chong Zheng Yao
-    public function updateBookingStatus(Request $request, Booking $booking)
-    {
-        $this->ensureAdminAccess();
+public function updateBookingStatus(Request $request, Booking $booking)
+{
 
-        $request->validate([
-            'status' => 'required|in:pending,confirmed,active,completed,cancelled',
-            'reason' => 'nullable|string|max:500',
-            'damage_charges' => 'nullable|numeric|min:0',
-            'notes' => 'nullable|string|max:1000'
-        ]);
+    $this->ensureAdminAccess();
 
-        $newStatus = $request->status;
-        $currentStatus = $booking->status;
+    $request->validate([
+        'status' => 'required|in:pending,confirmed,active,completed,cancelled',
+        'reason' => 'nullable|string|max:500',
+        'damage_charges' => 'nullable|numeric|min:0',
+        'notes' => 'nullable|string|max:1000'
+    ]);
 
-        // Use to validate & perform transition (State Pattern )
-        if (!$booking->canTransitionTo($newStatus)) {
+    $newStatus = $request->status;
+    $currentStatus = $booking->status;
+
+    // Use to validate & perform transition (State Pattern )
+    if (!$booking->canTransitionTo($newStatus)) {
+        return response()->json([
+            'success' => false,
+            'message' => "Cannot transition from '{$currentStatus}' to '{$newStatus}'. " .
+                "Allowed transitions: " . implode(', ', $booking->getAvailableActions())
+        ], 400);
+    }
+
+    // Perform the state transition
+    $transitioned = false;
+    $message = '';
+
+    try {
+        switch ($newStatus) {
+            case 'confirmed':
+                // Check payment status be4 confirming
+                if ($booking->payment_status !== 'paid' && $currentStatus === 'pending') {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Cannot confirm booking without payment. Payment status is: ' . $booking->payment_status
+                    ], 400);
+                }
+                $transitioned = $booking->confirm();
+                $message = 'Booking confirmed successfully';
+                break;
+
+            case 'active':
+                // pickup time has arrived ?
+                if ($booking->pickup_datetime > now()) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Cannot activate booking before pickup time: ' .
+                            $booking->pickup_datetime->format('M d, Y h:i A')
+                    ], 400);
+                }
+                $transitioned = $booking->activate();
+                $message = 'Booking activated (vehicle picked up)';
+                break;
+
+            case 'completed':
+                $completionData = [];
+                if ($request->filled('damage_charges')) {
+                    $completionData['damage_charges'] = $request->damage_charges;
+                }
+                if ($request->filled('notes')) {
+                    $completionData['notes'] = $request->notes;
+                }
+                $transitioned = $booking->complete($completionData);
+                $message = 'Booking completed successfully';
+                break;
+
+            case 'cancelled':
+                $reason = $request->reason ?? 'Cancelled by administrator';
+                $transitioned = $booking->cancel($reason);
+                $message = 'Booking cancelled successfully';
+                break;
+
+            default:
+                // For any other status, try direct update
+                $booking->status = $newStatus;
+                $booking->save();
+                $transitioned = true;
+                $message = 'Booking status updated to ' . $newStatus;
+        }
+
+        if (!$transitioned) {
             return response()->json([
                 'success' => false,
-                'message' => "Cannot transition from '{$currentStatus}' to '{$newStatus}'. " .
-                    "Allowed transitions: " . implode(', ', $booking->getAvailableActions())
+                'message' => 'Failed to transition booking status. Please check booking constraints.'
             ], 400);
         }
 
-        // Perform the state transition
-        $transitioned = false;
-        $message = '';
+        // updated state information
+        $booking->refresh();
+        $stateInfo = [
+            'currentState' => $booking->status,
+            'availableActions' => $booking->getAvailableActions(),
+            'nextState' => $booking->getNextState(),
+            'stateMessage' => $booking->getStateMessage(),
+            'statusBadgeColor' => $booking->status_badge_color
+        ];
 
-        try {
-            switch ($newStatus) {
-                case 'confirmed':
-                    // Check payment status be4 confirming
-                    if ($booking->payment_status !== 'paid' && $currentStatus === 'pending') {
-                        return response()->json([
-                            'success' => false,
-                            'message' => 'Cannot confirm booking without payment. Payment status is: ' . $booking->payment_status
-                        ], 400);
-                    }
-                    $transitioned = $booking->confirm();
-                    $message = 'Booking confirmed successfully';
-                    break;
-
-                case 'active':
-                    // pickup time has arrived ?
-                    if ($booking->pickup_datetime > now()) {
-                        return response()->json([
-                            'success' => false,
-                            'message' => 'Cannot activate booking before pickup time: ' .
-                                $booking->pickup_datetime->format('M d, Y h:i A')
-                        ], 400);
-                    }
-                    $transitioned = $booking->activate();
-                    $message = 'Booking activated (vehicle picked up)';
-                    break;
-
-                case 'completed':
-                    $completionData = [];
-                    if ($request->filled('damage_charges')) {
-                        $completionData['damage_charges'] = $request->damage_charges;
-                    }
-                    if ($request->filled('notes')) {
-                        $completionData['notes'] = $request->notes;
-                    }
-                    $transitioned = $booking->complete($completionData);
-                    $message = 'Booking completed successfully';
-                    break;
-
-                case 'cancelled':
-                    $reason = $request->reason ?? 'Cancelled by administrator';
-                    $transitioned = $booking->cancel($reason);
-                    $message = 'Booking cancelled successfully';
-                    break;
-
-                default:
-                    // For any other status, try direct update
-                    $booking->status = $newStatus;
-                    $booking->save();
-                    $transitioned = true;
-                    $message = 'Booking status updated to ' . $newStatus;
-            }
-
-            if (!$transitioned) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Failed to transition booking status. Please check booking constraints.'
-                ], 400);
-            }
-
-            // updated state information
-            $booking->refresh();
-            $stateInfo = [
-                'currentState' => $booking->status,
-                'availableActions' => $booking->getAvailableActions(),
-                'nextState' => $booking->getNextState(),
-                'stateMessage' => $booking->getStateMessage(),
-                'statusBadgeColor' => $booking->status_badge_color
-            ];
-
-            // retuen JSON for AJAX requests
-            if ($request->ajax()) {
-                return response()->json([
-                    'success' => true,
-                    'message' => $message,
-                    'stateInfo' => $stateInfo
-                ]);
-            }
-
-            // Redirect for regular requests
-            return back()->with('success', $message);
-        } catch (\Exception $e) {
-            Log::error('Booking status update failed', [
-                'booking_id' => $booking->id,
-                'attempted_status' => $newStatus,
-                'error' => $e->getMessage()
+        // retuen JSON for AJAX requests
+        if ($request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'stateInfo' => $stateInfo
             ]);
-
-            if ($request->ajax()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Error updating booking status: ' . $e->getMessage()
-                ], 500);
-            }
-
-            return back()->with('error', 'Error updating booking status: ' . $e->getMessage());
         }
+
+        // Redirect for regular requests
+        return back()->with('success', $message);
+    } catch (\Exception $e) {
+        Log::error('Booking status update failed', [
+            'booking_id' => $booking->id,
+            'attempted_status' => $newStatus,
+            'error' => $e->getMessage()
+        ]);
+
+        if ($request->ajax()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error updating booking status: ' . $e->getMessage()
+            ], 500);
+        }
+
+        return back()->with('error', 'Error updating booking status: ' . $e->getMessage());
     }
+}
 
     // Confirm a booking - Chong Zheng Yao
     public function confirmBooking(Request $request, Booking $booking)
