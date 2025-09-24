@@ -376,39 +376,13 @@ class VehicleService
     }
 
     /**
-     * Handle secure image upload for admin controller - File Upload Security with Malicious Content Detection
-     *
-     * @param \Illuminate\Http\UploadedFile $file
-     * @return string
-     * @throws \Exception
-     */
-    public function handleSecureImageUpload($file): string
-    {
-        try {
-            // Advanced security checks
-            if (!$this->isSecureImage($file)) {
-                throw new \Exception('Security validation failed');
-            }
-
-            // Secure filename generation
-            $secureName = Str::random(40) . '_' . time() . '.' . $file->getClientOriginalExtension();
-            $imagePath = $file->storeAs('vehicles', $secureName, 'public');
-
-            return '/storage/' . $imagePath;
-        } catch (\Exception $e) {
-            Log::error('Secure image upload failed: ' . $e->getMessage());
-            throw new \Exception('Failed to upload image securely');
-        }
-    }
-
-    /**
      * Standard image upload method - used internally by the service
      *
      * @param \Illuminate\Http\UploadedFile $image
      * @return string
      * @throws \Exception
      */
-    private function handleImageUpload($image): string
+    public function handleImageUpload($image): string
     {
         try {
             // Advanced security checks

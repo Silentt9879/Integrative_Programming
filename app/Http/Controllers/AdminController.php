@@ -481,7 +481,7 @@ class AdminController extends Controller
         if ($request->hasFile('image')) {
             // Use VehicleService for secure file handling
             $vehicleService = app(\App\Services\VehicleService::class);
-            $validated['image_url'] = $vehicleService->handleSecureImageUpload($request->file('image'));
+            $validated['image_url'] = $vehicleService->handleImageUpload($request->file('image'));
         }
 
         try {
@@ -544,7 +544,7 @@ class AdminController extends Controller
                 Storage::disk('public')->delete(str_replace('/storage/', '', $vehicle->image_url));
             }
 
-            $validated['image_url'] = $vehicleService->handleSecureImageUpload($request->file('image'));
+            $validated['image_url'] = $vehicleService->handleImageUpload($request->file('image'));
         }
 
         try {
