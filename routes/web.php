@@ -17,6 +17,7 @@ use App\Http\Controllers\UserReportsController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\AdminNotificationController;
 
 // ============================================================================
 // PUBLIC PAGES & STATIC CONTENT
@@ -172,6 +173,18 @@ Route::prefix('admin')->name('admin.')->middleware(\App\Http\Middleware\AdminMid
     Route::post('/customers', [AdminController::class, 'storeCustomer'])->name('customers.store');
     Route::put('/customers/{user}', [AdminController::class, 'updateCustomer'])->name('customers.update');
     Route::delete('/customers/{user}', [AdminController::class, 'deleteCustomer'])->name('customers.delete');
+
+    // ========================================================================
+    // **ADMIN NOTIFICATION SYSTEM - Jayvian Lazarus Jerome**
+    // ========================================================================
+    // Admin Notification Management Routes
+    Route::get('/notifications', [AdminNotificationController::class, 'index'])->name('notifications.index');
+    Route::get('/notifications/header', [AdminNotificationController::class, 'getHeaderNotifications'])->name('notifications.header');
+    Route::get('/notifications/stats', [AdminNotificationController::class, 'getStats'])->name('notifications.stats');
+    Route::get('/notifications/{id}', [AdminNotificationController::class, 'show'])->name('notifications.show');
+    Route::post('/notifications/{id}/read', [AdminNotificationController::class, 'markAsRead'])->name('notifications.read');
+    Route::post('/notifications/mark-all-read', [AdminNotificationController::class, 'markAllAsRead'])->name('notifications.mark-all-read');
+    Route::delete('/notifications/{id}', [AdminNotificationController::class, 'delete'])->name('notifications.delete');
 });
 
 // ========================================================================
@@ -440,4 +453,148 @@ Route::prefix('billing')->name('billing.')->group(function () {
     Route::post('/{booking}/pay-additional', [BillingController::class, 'payAdditionalCharges'])->name('pay-additional');
     Route::get('/summary/ajax', [BillingController::class, 'getSummary'])->name('summary');
     Route::get('/export/history', [BillingController::class, 'exportBillingHistory'])->name('export');
+});
+
+Route::get('/debug/test-observers', function() {
+    if (!Auth::check() || !Auth::user()->is_admin) {
+        abort(403, 'Admin access required');
+    }
+    
+    try {
+        // Test User Subject with fake data
+        $userSubject = new \App\Http\Controllers\Observer\Subjects\UserSubject();
+        $userSubject->attach(new \App\Http\Controllers\Observer\Observers\LoggingObserver());
+        
+        // Create a fake user registration event
+        $testUser = Auth::user(); // Use current admin user for testing
+        $registrationData = [
+            'source' => 'debug_test',
+            'registration_ip' => request()->ip(),
+            'user_agent' => request()->userAgent(),
+            'registration_time' => now()
+        ];
+        
+        $userSubject->notifyUserRegistered($testUser, $registrationData);
+        
+        // Test login event
+        $loginData = [
+            'ip_address' => request()->ip(),
+            'user_agent' => request()->userAgent(),
+            'login_time' => now(),
+            'remember_me' => false
+        ];
+        
+        $userSubject->notifyUserLogin($testUser, request()->ip(), $loginData);
+        
+        return response()->json([
+            'success' => true,
+            'message' => 'Observer test completed! Check your database tables.',
+            'tables_to_check' => [
+                'audit_logs',
+                'customer_management_logs', 
+                'security_logs',
+                'customer_activities'
+            ],
+            'timestamp' => now()
+        ]);
+        
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ], 500);
+    }
+});
+
+// Route to check recent log entries
+Route::get('/debug/check-logs', function() {
+    if (!Auth::check() || !Auth::user()->is_admin) {
+        abort(403, 'Admin access required');
+    }
+    
+    $logs = [
+        'audit_logs' => \Illuminate\Support\Facades\DB::table('audit_logs')
+            ->orderBy('created_at', 'desc')
+            ->limit(3)
+            ->get(),
+            
+        'customer_management_logs' => \Illuminate\Support\Facades\DB::table('customer_management_logs')
+            ->orderBy('created_at', 'desc')
+            ->limit(3)
+            ->get(),
+            
+        'security_logs' => \Illuminate\Support\Facades\DB::table('security_logs')
+            ->orderBy('created_at', 'desc')
+            ->limit(3)
+            ->get(),
+            
+        'business_operation_logs' => \Illuminate\Support\Facades\DB::table('business_operation_logs')
+            ->orderBy('created_at', 'desc')
+            ->limit(3)
+            ->get()
+    ];
+    
+    return response()->json([
+        'success' => true,
+        'recent_logs' => $logs,
+        'total_counts' => [
+            'audit_logs' => \Illuminate\Support\Facades\DB::table('audit_logs')->count(),
+            'customer_management_logs' => \Illuminate\Support\Facades\DB::table('customer_management_logs')->count(),
+            'security_logs' => \Illuminate\Support\Facades\DB::table('security_logs')->count(),
+            'business_operation_logs' => \Illuminate\Support\Facades\DB::table('business_operation_logs')->count()
+        ]
+    ]);
+});
+
+Route::get('/analytics-test', function() {
+    // Check admin access
+    if (!Auth::check() || !Auth::user()->is_admin) {
+        abort(403, 'Admin access required');
+    }
+    
+    $userSubject = new \App\Http\Controllers\Observer\Subjects\UserSubject();
+    $userSubject->attach(new \App\Http\Controllers\Observer\Observers\AnalyticsObserver());
+    
+    if ($user = \App\Models\User::first()) {
+        $userSubject->notifyUserLogin($user, request()->ip(), [
+            'user_agent' => request()->userAgent()
+        ]);
+    }
+    
+    return 'Analytics data saved! Check analytics_daily table.';
+});
+
+Route::get('/create-test-notifications', function() {
+    if (!Auth::check() || !Auth::user()->is_admin) {
+        return redirect()->route('admin.login');
+    }
+    
+    DB::table('admin_notifications')->insert([
+        [
+            'type' => 'new_customer',
+            'title' => 'New Customer Registration',
+            'message' => 'John Doe has registered and requires approval',
+            'priority' => 'medium',
+            'action_required' => true,
+            'related_user_id' => Auth::id(),
+            'metadata' => json_encode(['customer_email' => 'john@test.com']),
+            'is_read' => false,
+            'created_at' => now(),
+            'updated_at' => now()
+        ],
+        [
+            'type' => 'security_alert',
+            'title' => 'Suspicious Login Activity',
+            'message' => 'Multiple failed login attempts detected',
+            'priority' => 'high',
+            'action_required' => true,
+            'metadata' => json_encode(['ip_address' => '192.168.1.100']),
+            'is_read' => false,
+            'created_at' => now(),
+            'updated_at' => now()
+        ]
+    ]);
+    
+    return 'Test notifications created! Visit <a href="/admin/notifications">/admin/notifications</a>';
 });

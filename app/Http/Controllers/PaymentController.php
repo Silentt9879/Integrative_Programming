@@ -219,15 +219,12 @@ class PaymentController extends Controller
                 ->with('info', 'No additional charges found for this booking.');
         }
 
-        // Store in session to track this is additional payment
         session(['is_additional_payment' => true]);
 
-        // Temporarily set the booking amount to additional charges for the form
         $originalAmount = $booking->total_amount;
         $booking->total_amount = $additionalCharges;
         session(['original_booking_amount' => $originalAmount]);
 
-        // Use the same payment form
         return view('payment.form', compact('booking'));
     }
 

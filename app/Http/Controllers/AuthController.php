@@ -10,8 +10,29 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Support\Facades\Log;
 
+// Observer Pattern
+use App\Http\Controllers\Observer\Subjects\UserSubject;
+use App\Http\Controllers\Observer\Observers\EmailNotificationObserver;
+use App\Http\Controllers\Observer\Observers\LoggingObserver;
+use App\Http\Controllers\Observer\Observers\AnalyticsObserver;
+use App\Http\Controllers\Observer\Observers\AdminNotificationObserver;
+
 class AuthController extends Controller
 {
+    private UserSubject $userSubject;
+
+    public function __construct()
+    {
+        // Initialize Observer Pattern
+        $this->userSubject = new UserSubject();
+        
+        // Attach all observers
+        $this->userSubject->attach(new EmailNotificationObserver());
+        $this->userSubject->attach(new LoggingObserver());
+        $this->userSubject->attach(new AnalyticsObserver());
+        $this->userSubject->attach(new AdminNotificationObserver());
+    }
+
     public function showLogin()
     {
         return view('auth.login');
@@ -23,8 +44,8 @@ class AuthController extends Controller
     }
 
     /**
- * ENHANCED: Handle vehicle booking intent after login
- */
+     * ENHANCED: Handle vehicle booking intent after login WITH OBSERVER PATTERN
+     */
     public function login(Request $request)
     {
         // Validate the form data
@@ -49,28 +70,38 @@ class AuthController extends Controller
 
             $user = Auth::user();
         
-        // CRITICAL: Check if user is admin - redirect them to admin login
-        if ($user->is_admin) {
-            Auth::logout(); // Logout admin user
-            return back()->withErrors([
-                'email' => 'Admin users must use the Admin Login panel. Please use the Admin link in the navigation.'
-            ])->withInput($request->only('email'));
-        }
+            // CRITICAL: Check if user is admin - redirect them to admin login
+            if ($user->is_admin) {
+                Auth::logout(); // Logout admin user
+                return back()->withErrors([
+                    'email' => 'Admin users must use the Admin Login panel. Please use the Admin link in the navigation.'
+                ])->withInput($request->only('email'));
+            }
 
-        // Check if user is active (for regular users only)
-        if ($user->status !== 'active') {
-            Auth::logout();
-            return back()->withErrors([
-                'email' => 'Your account has been suspended. Please contact support.'
-            ])->withInput($request->only('email'));
-        }
+            // Check if user is active (for regular users only)
+            if ($user->status !== 'active') {
+                Auth::logout();
+                return back()->withErrors([
+                    'email' => 'Your account has been suspended. Please contact support.'
+                ])->withInput($request->only('email'));
+            }
 
-        // ENSURE first-time flag is NOT set for returning users
-        session()->forget('is_first_time_user');
+            // OBSERVER PATTERN: Notify observers about user login
+            $loginData = [
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+                'login_time' => now(),
+                'remember_me' => $remember
+            ];
+            
+            $this->userSubject->notifyUserLogin($user, $request->ip(), $loginData);
 
-        // Default redirect to dashboard (regular users only)
-        return redirect()->intended(route('dashboard'))
-            ->with('success', 'Welcome back, ' . $user->name . '!');
+            // ENSURE first-time flag is NOT set for returning users
+            session()->forget('is_first_time_user');
+
+            // Default redirect to dashboard (regular users only)
+            return redirect()->intended(route('dashboard'))
+                ->with('success', 'Welcome back, ' . $user->name . '!');
         }
 
         // Authentication failed
@@ -80,7 +111,7 @@ class AuthController extends Controller
     }
 
     /**
-     * ENHANCED: Handle vehicle booking intent after registration
+     * ENHANCED: Handle vehicle booking intent after registration WITH OBSERVER PATTERN
      */
     public function register(Request $request)
     {
@@ -138,6 +169,19 @@ class AuthController extends Controller
                 'password' => Hash::make($request->password),
                 'status' => 'active'
             ]);
+
+            // OBSERVER PATTERN: Notify observers about new user registration
+            $registrationData = [
+                'source' => 'web_registration',
+                'registration_ip' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+                'has_phone' => !empty($user->phone),
+                'has_address' => !empty($user->address),
+                'has_date_of_birth' => !empty($user->date_of_birth),
+                'registration_time' => now()
+            ];
+
+            $this->userSubject->notifyUserRegistered($user, $registrationData);
 
             // Log the user in automatically
             Auth::login($user);
