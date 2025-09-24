@@ -5,6 +5,7 @@
 
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\VehicleController;
+use App\Http\Controllers\BillingController;
 use App\Http\Controllers\BookingController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\AuthController;
@@ -22,6 +23,7 @@ use Illuminate\Support\Facades\Route;
 // ============================================================================
 // Home and Static Pages (General Team Contribution)
 Route::get('/', [HomeController::class, 'index'])->name('app');
+Route::get('/billing', [HomeController::class, 'billing'])->name('billing');
 Route::get('/about', [HomeController::class, 'about'])->name('about');
 Route::get('/contact', [HomeController::class, 'contact'])->name('contact');
 
@@ -414,4 +416,28 @@ Route::prefix('admin/cache')->name('admin.cache.')
     ->middleware(\App\Http\Middleware\AdminMiddleware::class)->group(function () {
     Route::post('/vehicles/clear', [VehicleController::class, 'clearCache'])
         ->name('vehicles.clear');
+});
+
+// ========================================================================
+// **ADMIN BILLING MANAGEMENT - NEW**    CHIEW CHUN SHENG
+// ========================================================================
+Route::prefix('admin')->name('admin.')->middleware(\App\Http\Middleware\AdminMiddleware::class)->group(function () {
+    Route::prefix('billing')->name('billing.')->group(function () {
+        Route::get('/', [AdminController::class, 'adminBilling'])->name('index');
+        Route::post('/set-charges/{booking}', [AdminController::class, 'setAdditionalCharges'])->name('set-charges');
+        Route::post('/waive-charges/{booking}', [AdminController::class, 'waiveCharges'])->name('waive-charges');
+        Route::get('/outstanding-report', [AdminController::class, 'outstandingChargesReport'])->name('outstanding-report');
+    });
+});
+
+// ========================================================================
+// **BILLING MODULE - NEW**
+// ========================================================================
+// User Billing Management
+Route::prefix('billing')->name('billing.')->group(function () {
+    Route::get('/', [BillingController::class, 'index'])->name('index');
+    Route::get('/{booking}', [BillingController::class, 'show'])->name('show');
+    Route::post('/{booking}/pay-additional', [BillingController::class, 'payAdditionalCharges'])->name('pay-additional');
+    Route::get('/summary/ajax', [BillingController::class, 'getSummary'])->name('summary');
+    Route::get('/export/history', [BillingController::class, 'exportBillingHistory'])->name('export');
 });

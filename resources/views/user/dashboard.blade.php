@@ -260,6 +260,12 @@
                                 <i class="fas fa-calendar-check me-1"></i>Booking
                             </a>
                         </li>
+                        <li class="nav-item billing-nav-item">
+                            <a class="nav-link" href="{{ route('billing.index') }}">
+                                <i class="fas fa-file-invoice-dollar me-1"></i>Billing
+                                <span id="billing-badge" class="billing-badge" style="display: none;">0</span>
+                            </a>
+                        </li>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
                                 <i class="fas fa-user me-1"></i>{{ Auth::user()->name }}

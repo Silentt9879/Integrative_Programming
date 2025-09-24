@@ -10,13 +10,13 @@ class HomeController extends Controller
 {
     public function index()
     {
-        
+
         $vehicles = Vehicle::with('rentalRate')
             ->where('status', 'available')
             ->orderBy('created_at', 'desc')
             ->limit(6)
             ->get();
-            
+
         return view('home', compact('vehicles'));
     }
 
@@ -30,18 +30,23 @@ class HomeController extends Controller
         return view('contact');
     }
 
+    public function billing()
+    {
+        return view('billing');
+    }
+
     public function dashboard()
     {
-        
+
         $user = Auth::user();
-        
-        
+
+
         $availableVehicles = Vehicle::where('status', 'available')->count();
-        
-        
+
+
         $totalBookings = 0;
         $activeBookings = 0;
-        
+
         // Determine member status based on bookings
         $memberStatus = 'New';
         if ($totalBookings > 10) {
@@ -51,11 +56,11 @@ class HomeController extends Controller
         } elseif ($totalBookings > 0) {
             $memberStatus = 'Member';
         }
-        
+
         return view('user.dashboard', compact(
-            'totalBookings', 
-            'activeBookings', 
-            'availableVehicles', 
+            'totalBookings',
+            'activeBookings',
+            'availableVehicles',
             'memberStatus'
         ));
     }

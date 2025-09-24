@@ -1150,6 +1150,284 @@ class AdminController extends Controller
     }
 
     /**
+     * ========================================================================
+     * NEW BILLING MANAGEMENT METHODS
+     * ========================================================================
+     */
+
+    /**
+     * Admin billing overview - show all bookings with outstanding charges
+     */
+    public function adminBilling(Request $request)
+    {
+        $this->ensureAdminAccess();
+
+        $query = Booking::with(['user', 'vehicle'])
+            ->where(function ($q) {
+                $q->where('damage_charges', '>', 0)
+                    ->orWhere('late_fees', '>', 0)
+                    ->orWhere('payment_status', 'partial')
+                    ->orWhere('payment_status', 'pending');
+            });
+
+        // Apply filters
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        if ($request->filled('payment_status')) {
+            $query->where('payment_status', $request->payment_status);
+        }
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->whereHas('user', function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%");
+            })->orWhere('booking_number', 'like', "%{$search}%");
+        }
+
+        $outstandingBookings = $query->orderBy('updated_at', 'desc')->paginate(20);
+
+        // Calculate statistics
+        $totalOutstanding = Booking::where(function ($q) {
+            $q->where('damage_charges', '>', 0)
+                ->orWhere('late_fees', '>', 0)
+                ->orWhere('payment_status', 'partial')
+                ->orWhere('payment_status', 'pending');
+        })->sum('damage_charges') + Booking::where(function ($q) {
+            $q->where('damage_charges', '>', 0)
+                ->orWhere('late_fees', '>', 0)
+                ->orWhere('payment_status', 'partial')
+                ->orWhere('payment_status', 'pending');
+        })->sum('late_fees');
+
+        $pendingCharges = Booking::where('damage_charges', '>', 0)
+            ->orWhere('late_fees', '>', 0)
+            ->count();
+
+        return view('admin.billing.index', compact('outstandingBookings', 'totalOutstanding', 'pendingCharges'));
+    }
+
+    /**
+     * Set additional charges for a booking (damage, late fees)
+     */
+    public function setAdditionalCharges(Request $request, Booking $booking)
+    {
+        $this->ensureAdminAccess();
+
+        $validated = $request->validate([
+            'damage_charges' => 'nullable|numeric|min:0|max:10000',
+            'late_fees' => 'nullable|numeric|min:0|max:5000',
+            'charge_reason' => 'required|string|max:1000',
+            'charge_notes' => 'nullable|string|max:500'
+        ]);
+
+        try {
+            DB::beginTransaction();
+
+            // Update booking with charges
+            $booking->update([
+                'damage_charges' => $validated['damage_charges'] ?? 0,
+                'late_fees' => $validated['late_fees'] ?? 0,
+                'notes' => ($booking->notes ?? '') . "\n\nAdditional Charges Applied by Admin:\n" . 
+                          $validated['charge_reason'] . 
+                          ($validated['charge_notes'] ? "\nNotes: " . $validated['charge_notes'] : ''),
+                'updated_at' => now()
+            ]);
+
+            // Calculate total additional charges
+            $totalAdditional = ($validated['damage_charges'] ?? 0) + ($validated['late_fees'] ?? 0);
+
+            // Update final amount
+            $booking->update([
+                'final_amount' => $booking->total_amount + $totalAdditional
+            ]);
+
+            // If there are additional charges, update payment status
+            if ($totalAdditional > 0) {
+                if ($booking->payment_status === 'paid') {
+                    // If previously paid, now has outstanding additional charges
+                    $booking->update(['payment_status' => 'partial']);
+                }
+            }
+
+            DB::commit();
+
+            Log::info("Admin set additional charges for booking {$booking->id}", [
+                'admin_id' => Auth::id(),
+                'booking_id' => $booking->id,
+                'damage_charges' => $validated['damage_charges'] ?? 0,
+                'late_fees' => $validated['late_fees'] ?? 0,
+                'reason' => $validated['charge_reason']
+            ]);
+
+            if ($request->ajax()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Additional charges set successfully',
+                    'damage_charges' => $booking->damage_charges,
+                    'late_fees' => $booking->late_fees,
+                    'final_amount' => $booking->final_amount,
+                    'payment_status' => $booking->payment_status
+                ]);
+            }
+
+            return back()->with('success', 'Additional charges of $' . number_format($totalAdditional, 2) . ' applied successfully.');
+
+        } catch (\Exception $e) {
+            DB::rollback();
+            
+            Log::error("Failed to set additional charges for booking {$booking->id}: " . $e->getMessage());
+
+            if ($request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to set additional charges: ' . $e->getMessage()
+                ], 500);
+            }
+
+            return back()->with('error', 'Failed to set additional charges. Please try again.');
+        }
+    }
+
+    /**
+     * Waive charges for a booking
+     */
+    public function waiveCharges(Request $request, Booking $booking)
+    {
+        $this->ensureAdminAccess();
+
+        $validated = $request->validate([
+            'waive_damage' => 'boolean',
+            'waive_late_fees' => 'boolean',
+            'waive_reason' => 'required|string|max:500'
+        ]);
+
+        try {
+            DB::beginTransaction();
+
+            $originalDamage = $booking->damage_charges;
+            $originalLateFees = $booking->late_fees;
+
+            // Waive selected charges
+            if ($validated['waive_damage']) {
+                $booking->damage_charges = 0;
+            }
+
+            if ($validated['waive_late_fees']) {
+                $booking->late_fees = 0;
+            }
+
+            // Update final amount
+            $booking->final_amount = $booking->total_amount + $booking->damage_charges + $booking->late_fees;
+
+            // Add waiver note
+            $booking->notes = ($booking->notes ?? '') . "\n\nCharges Waived by Admin:\n" . $validated['waive_reason'];
+
+            // Update payment status if all additional charges are waived
+            if ($booking->damage_charges == 0 && $booking->late_fees == 0 && $booking->payment_status === 'partial') {
+                $booking->payment_status = 'paid';
+            }
+
+            $booking->save();
+
+            DB::commit();
+
+            $waivedAmount = ($validated['waive_damage'] ? $originalDamage : 0) + 
+                           ($validated['waive_late_fees'] ? $originalLateFees : 0);
+
+            Log::info("Admin waived charges for booking {$booking->id}", [
+                'admin_id' => Auth::id(),
+                'booking_id' => $booking->id,
+                'waived_amount' => $waivedAmount,
+                'reason' => $validated['waive_reason']
+            ]);
+
+            if ($request->ajax()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Charges waived successfully',
+                    'waived_amount' => $waivedAmount,
+                    'remaining_charges' => $booking->damage_charges + $booking->late_fees,
+                    'payment_status' => $booking->payment_status
+                ]);
+            }
+
+            return back()->with('success', 'Charges of $' . number_format($waivedAmount, 2) . ' waived successfully.');
+
+        } catch (\Exception $e) {
+            DB::rollback();
+            
+            Log::error("Failed to waive charges for booking {$booking->id}: " . $e->getMessage());
+
+            if ($request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to waive charges: ' . $e->getMessage()
+                ], 500);
+            }
+
+            return back()->with('error', 'Failed to waive charges. Please try again.');
+        }
+    }
+
+    /**
+     * Generate outstanding charges report
+     */
+    public function outstandingChargesReport(Request $request)
+    {
+        $this->ensureAdminAccess();
+
+        $validated = $request->validate([
+            'date_from' => 'nullable|date',
+            'date_to' => 'nullable|date|after_or_equal:date_from',
+            'format' => 'string|in:pdf,excel,csv'
+        ]);
+
+        $query = Booking::with(['user', 'vehicle'])
+            ->where(function ($q) {
+                $q->where('damage_charges', '>', 0)
+                    ->orWhere('late_fees', '>', 0)
+                    ->orWhere('payment_status', 'partial')
+                    ->orWhere('payment_status', 'pending');
+            });
+
+        if (isset($validated['date_from'])) {
+            $query->where('created_at', '>=', $validated['date_from']);
+        }
+
+        if (isset($validated['date_to'])) {
+            $query->where('created_at', '<=', $validated['date_to']);
+        }
+
+        $outstandingBookings = $query->orderBy('created_at', 'desc')->get();
+
+        // Calculate totals
+        $totalDamageCharges = $outstandingBookings->sum('damage_charges');
+        $totalLateFees = $outstandingBookings->sum('late_fees');
+        $totalOutstanding = $totalDamageCharges + $totalLateFees;
+
+        $reportData = [
+            'bookings' => $outstandingBookings,
+            'totals' => [
+                'damage_charges' => $totalDamageCharges,
+                'late_fees' => $totalLateFees,
+                'total_outstanding' => $totalOutstanding,
+                'count' => $outstandingBookings->count()
+            ],
+            'date_from' => $validated['date_from'] ?? null,
+            'date_to' => $validated['date_to'] ?? null,
+            'generated_at' => now(),
+            'generated_by' => Auth::user()->name
+        ];
+
+        // For now, return a view that can be printed/exported
+        // You can integrate with PDF/Excel libraries as needed
+        return view('admin.billing.outstanding-report', $reportData);
+    }
+
+    /**
      * Create additional charges payment for late fees and damages
      */
     private function createAdditionalChargesPayment(Booking $booking, $totalCharges, $lateFees, $damageCharges)

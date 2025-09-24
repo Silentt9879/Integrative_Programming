@@ -36,11 +36,19 @@ class PaymentController extends Controller
             'bank_name' => 'nullable|required_if:payment_method,online_banking|string',
             'payment_amount' => 'required|numeric|min:0'
         ]);
+
         $booking = Booking::with(['vehicle'])
             ->where('id', $bookingId)
             ->where('user_id', Auth::id())
-            ->where('payment_status', 'pending')
             ->firstOrFail();
+
+        // Check if this is additional payment
+        $isAdditional = session('is_additional_payment', false);
+
+        if (!$isAdditional && $booking->payment_status != 'pending') {
+            return redirect()->route('booking.show', $bookingId)
+                ->with('error', 'This booking has already been paid.');
+        }
 
         // Simulate payment processing delay
         return view('payment.processing', [
@@ -54,47 +62,69 @@ class PaymentController extends Controller
         $booking = Booking::with(['vehicle'])
             ->where('id', $bookingId)
             ->where('user_id', Auth::id())
-            ->where('payment_status', 'pending')
             ->firstOrFail();
+
+        // Check if this is additional payment
+        $isAdditional = session('is_additional_payment', false);
 
         $success = rand(1, 100) <= 95;
 
         if ($success) {
-            // Update payment status first
-            $booking->update([
-                'payment_status' => 'paid',
-                'final_amount' => $request->input('amount', $booking->total_amount)
-            ]);
+            if ($isAdditional) {
+                // Clear additional charges
+                $booking->update([
+                    'damage_charges' => 0,
+                    'late_fees' => 0
+                ]);
 
-            // Use state pattern to confirm booking (this will update vehicle status to 'rented')
-            $confirmed = $booking->confirm();
+                // Clear session
+                session()->forget('is_additional_payment');
+                session()->forget('original_booking_amount');
 
-            if (!$confirmed) {
-                \Illuminate\Support\Facades\Log::error("Failed to confirm booking {$booking->id} after payment");
-                // Rollback payment status if confirmation failed
-                $booking->update(['payment_status' => 'pending']);
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Payment successful but booking confirmation failed. Please contact support.',
-                    'error_code' => 'CONFIRMATION_FAILED'
-                ], 400);
+                // Restore original amount if needed
+                if ($originalAmount = session('original_booking_amount')) {
+                    $booking->total_amount = $originalAmount;
+                }
+
+                $message = 'Additional charges paid successfully!';
+            } else {
+                // Regular payment
+                $booking->update([
+                    'payment_status' => 'paid',
+                    'final_amount' => $request->input('amount', $booking->total_amount)
+                ]);
+
+                // Use state pattern to confirm booking
+                $confirmed = $booking->confirm();
+
+                if (!$confirmed) {
+                    Log::error("Failed to confirm booking {$booking->id} after payment");
+                    $booking->update(['payment_status' => 'pending']);
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Payment successful but booking confirmation failed. Please contact support.',
+                        'error_code' => 'CONFIRMATION_FAILED'
+                    ], 400);
+                }
+
+                $message = 'Payment processed successfully!';
             }
 
-            \Illuminate\Support\Facades\Log::info('Payment completed successfully', [
+            Log::info('Payment completed successfully', [
                 'booking_id' => $booking->id,
                 'booking_number' => $booking->booking_number,
-                'vehicle_id' => $booking->vehicle->id,
+                'is_additional' => $isAdditional,
                 'amount' => $booking->total_amount
             ]);
 
             return response()->json([
                 'success' => true,
-                'message' => 'Payment processed successfully!',
+                'message' => $message,
                 'transaction_id' => 'TXN' . time() . rand(1000, 9999),
                 'redirect_url' => route('payment.success', $booking->id)
             ]);
         } else {
-            \Illuminate\Support\Facades\Log::warning('Payment failed', [
+            Log::warning('Payment failed', [
                 'booking_id' => $booking->id,
                 'booking_number' => $booking->booking_number,
                 'reason' => 'Random failure for demo purposes'
@@ -169,6 +199,8 @@ class PaymentController extends Controller
         ]);
     }
 
+    // Add this method to PaymentController.php if it doesn't exist or update it:
+
     /**
      * Show additional charges payment form
      */
@@ -177,101 +209,35 @@ class PaymentController extends Controller
         $booking = Booking::with(['vehicle', 'vehicle.rentalRate'])
             ->where('id', $bookingId)
             ->where('user_id', Auth::id())
-            ->where('payment_status', 'additional_charges_pending')
             ->firstOrFail();
 
-        // Get the pending additional charges payment
-        $additionalPayment = \App\Models\Payment::where('booking_id', $booking->id)
-            ->where('payment_type', 'additional_charges')
-            ->where('status', 'pending')
-            ->first();
+        // Check for unpaid additional charges
+        $additionalCharges = $booking->damage_charges + $booking->late_fees;
 
-        if (!$additionalPayment) {
+        if ($additionalCharges <= 0) {
             return redirect()->route('booking.show', $booking->id)
-                ->with('error', 'No additional charges found for this booking.');
+                ->with('info', 'No additional charges found for this booking.');
         }
 
-        return view('payment.additional-charges', compact('booking', 'additionalPayment'));
+        // Store in session to track this is additional payment
+        session(['is_additional_payment' => true]);
+
+        // Temporarily set the booking amount to additional charges for the form
+        $originalAmount = $booking->total_amount;
+        $booking->total_amount = $additionalCharges;
+        session(['original_booking_amount' => $originalAmount]);
+
+        // Use the same payment form
+        return view('payment.form', compact('booking'));
     }
 
     /**
-     * Process additional charges payment
+     * Process additional charges (reuse existing processPayment)
      */
     public function processAdditionalCharges(Request $request, $bookingId)
     {
-        $validated = $request->validate([
-            'payment_method' => 'required|in:credit_card,debit_card,online_banking',
-            'card_number' => 'nullable|required_if:payment_method,credit_card,debit_card|string|min:16|max:19',
-            'card_holder' => 'nullable|required_if:payment_method,credit_card,debit_card|string|max:255',
-            'expiry_month' => 'nullable|required_if:payment_method,credit_card,debit_card|integer|between:1,12',
-            'expiry_year' => 'nullable|required_if:payment_method,credit_card,debit_card|integer|min:2025',
-            'cvv' => 'nullable|required_if:payment_method,credit_card,debit_card|string|min:3|max:4',
-            'bank_name' => 'nullable|required_if:payment_method,online_banking|string',
-        ]);
-
-        $booking = Booking::with(['vehicle'])
-            ->where('id', $bookingId)
-            ->where('user_id', Auth::id())
-            ->where('payment_status', 'additional_charges_pending')
-            ->firstOrFail();
-
-        $additionalPayment = \App\Models\Payment::where('booking_id', $booking->id)
-            ->where('payment_type', 'additional_charges')
-            ->where('status', 'pending')
-            ->firstOrFail();
-
-        return view('payment.processing-additional', [
-            'booking' => $booking,
-            'additionalPayment' => $additionalPayment,
-            'payment_data' => $validated
-        ]);
-    }
-
-    /**
-     * Complete additional charges payment
-     */
-    public function completeAdditionalCharges(Request $request, $bookingId)
-    {
-        $booking = Booking::with(['vehicle'])
-            ->where('id', $bookingId)
-            ->where('user_id', Auth::id())
-            ->where('payment_status', 'additional_charges_pending')
-            ->firstOrFail();
-
-        $additionalPayment = \App\Models\Payment::where('booking_id', $booking->id)
-            ->where('payment_type', 'additional_charges')
-            ->where('status', 'pending')
-            ->firstOrFail();
-
-        // Simulate payment processing (95% success rate)
-        $success = rand(1, 100) <= 95;
-
-        if ($success) {
-            // Update payment status
-            $additionalPayment->update([
-                'status' => 'completed',
-                'payment_date' => now(),
-                'payment_method' => $request->input('payment_method', 'credit_card')
-            ]);
-
-            // Update booking payment status
-            $booking->update([
-                'payment_status' => 'paid_with_additional'
-            ]);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Additional charges payment processed successfully!',
-                'transaction_id' => 'TXN' . time() . rand(1000, 9999),
-                'redirect_url' => route('payment.additional-success', $booking->id)
-            ]);
-        } else {
-            return response()->json([
-                'success' => false,
-                'message' => 'Payment failed. Please try again.',
-                'error_code' => 'PAYMENT_DECLINED'
-            ], 400);
-        }
+        // Simply redirect to the existing processPayment method
+        return $this->processPayment($request, $bookingId);
     }
 
     /**
