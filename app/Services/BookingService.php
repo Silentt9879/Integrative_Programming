@@ -13,9 +13,7 @@ use Illuminate\Support\Facades\Log;
 
 class BookingService
 {
-    /**
-     * Create a new booking using State Pattern
-     */
+    //Create a new booking
     public function createBooking(array $data): Booking
     {
         return DB::transaction(function () use ($data) {
@@ -88,9 +86,7 @@ class BookingService
         });
     }
 
-    /**
-     * Update booking status using State Pattern
-     */
+    // Update booking status
     public function updateBookingStatus(Booking $booking, string $newStatus, array $data = []): bool
     {
         $currentState = $booking->getState();
@@ -120,9 +116,7 @@ class BookingService
         return $result;
     }
 
-    /**
-     * Cancel booking using State Pattern
-     */
+    //Cancel booking 
     public function cancelBooking(Booking $booking, string $reason = 'Cancelled by customer'): bool
     {
         if (!$booking->canPerformAction('cancel')) {
@@ -138,9 +132,7 @@ class BookingService
         return $result;
     }
 
-    /**
-     * Confirm booking using State Pattern
-     */
+    //Confirm booking
     public function confirmBooking(Booking $booking): bool
     {
         if (!$booking->canPerformAction('confirm')) {
@@ -154,9 +146,7 @@ class BookingService
         return $booking->confirm();
     }
 
-    /**
-     * Activate booking (mark as picked up) using State Pattern
-     */
+    //Activate booking (mark as picked up)
     public function activateBooking(Booking $booking): bool
     {
         if (!$booking->canPerformAction('activate')) {
@@ -166,9 +156,7 @@ class BookingService
         return $booking->activate();
     }
 
-    /**
-     * Complete booking using State Pattern
-     */
+    //Complete booking
     public function completeBooking(Booking $booking, array $data = []): bool
     {
         if (!$booking->canPerformAction('complete')) {
@@ -184,9 +172,7 @@ class BookingService
         return $result;
     }
 
-    /**
-     * Get booking with state information
-     */
+    //Get booking
     public function getBookingWithState(int $bookingId, ?int $userId = null): Booking
     {
         $query = Booking::with(['vehicle', 'vehicle.rentalRate'])
@@ -207,9 +193,7 @@ class BookingService
         return $booking;
     }
 
-    /**
-     * Get user bookings with filtering and state information
-     */
+    //Get user bookings with filtering and state information
     public function getUserBookings(int $userId, array $filters = [])
     {
         $query = Booking::with(['vehicle', 'vehicle.rentalRate'])
@@ -247,9 +231,7 @@ class BookingService
         return $bookings;
     }
 
-    /**
-     * Check if vehicle is available for booking
-     */
+    //Check if vehicle is available for booking
     public function isVehicleAvailable(int $vehicleId, Carbon $pickupDate, Carbon $returnDate): bool
     {
         $overlappingBookings = Booking::where('vehicle_id', $vehicleId)
@@ -268,9 +250,7 @@ class BookingService
         return !$overlappingBookings;
     }
 
-    /**
-     * Get booking statistics using State Pattern
-     */
+
     public function getBookingStatistics(?int $userId = null): array
     {
         $query = Booking::query();
@@ -301,9 +281,7 @@ class BookingService
         ];
     }
 
-    /**
-     * Validate booking time constraints
-     */
+
     private function validateBookingTime(Carbon $pickupDateTime, Carbon $returnDateTime): void
     {
         if ($pickupDateTime <= now()) {
@@ -319,9 +297,8 @@ class BookingService
         }
     }
 
-    /**
-     * Clear vehicle cache when booking status affects availability
-     */
+
+    //Clear vehicle cache when booking status affects availability
     private function clearVehicleCache(): void
     {
         $commonFilters = ['', 'type=Economy', 'type=Luxury', 'type=Sedan', 'type=SUV', 'type=Van', 'type=Truck'];

@@ -25,10 +25,8 @@ class BookingApiController extends Controller
         $this->bookingService = $bookingService;
     }
 
-    /**
-     * Get user's bookings with State Pattern information
-     * GET /api/v1/bookings
-     */
+
+    //Get user's bookings
     public function index(Request $request): JsonResponse
     {
         try {
@@ -52,10 +50,7 @@ class BookingApiController extends Controller
         }
     }
 
-    /**
-     * Show specific booking with State Pattern information
-     * GET /api/v1/bookings/{id}
-     */
+    //Show specific booking with State Pattern information
     public function show(int $id): JsonResponse
     {
         try {
@@ -75,13 +70,11 @@ class BookingApiController extends Controller
         }
     }
 
-    /**
-     * Create new booking using State Pattern with Enhanced Security
-     * POST /api/v1/bookings
-     */
+
+    //Create new booking
     public function store(StoreBookingRequest $request): JsonResponse
     {
-        // Rate limiting check for global booking activity (abuse detection)
+        // Rate limiting check for  booking activity
         if (RateLimiter::tooManyAttempts('booking-global-activity:' . Auth::id(), 50)) {
             Log::warning('Booking API global activity abuse detected', [
                 'user_id' => Auth::id(),
@@ -154,10 +147,7 @@ class BookingApiController extends Controller
         }
     }
 
-    /**
-     * Update booking status using State Pattern with Enhanced Security
-     * PATCH /api/v1/bookings/{id}/status
-     */
+    //Update booking status 
     public function updateStatus(UpdateBookingRequest $request, int $id): JsonResponse
     {
         // Rate limiting check for status update abuse
@@ -209,10 +199,8 @@ class BookingApiController extends Controller
         }
     }
 
-    /**
-     * Cancel booking using State Pattern with Enhanced Security
-     * DELETE /api/v1/bookings/{id}
-     */
+
+    //Cancel booking 
     public function destroy(int $id, Request $request): JsonResponse
     {
         // Rate limiting for cancellation abuse
@@ -274,10 +262,8 @@ class BookingApiController extends Controller
         }
     }
 
-    /**
-     * Confirm booking using State Pattern with Enhanced Security
-     * POST /api/v1/bookings/{id}/confirm
-     */
+
+    //Confirm booking 
     public function confirm(int $id): JsonResponse
     {
         // Rate limiting for state change abuse
@@ -319,10 +305,8 @@ class BookingApiController extends Controller
         }
     }
 
-    /**
-     * Activate booking (mark as picked up) using State Pattern with Enhanced Security
-     * POST /api/v1/bookings/{id}/activate
-     */
+
+    //Activate booking (mark as picked up)
     public function activate(int $id): JsonResponse
     {
         // Rate limiting for state change abuse
@@ -363,10 +347,8 @@ class BookingApiController extends Controller
         }
     }
 
-    /**
-     * Complete booking using State Pattern with Enhanced Security
-     * POST /api/v1/bookings/{id}/complete
-     */
+  
+    //Complete booking
     public function complete(Request $request, int $id): JsonResponse
     {
         // Rate limiting for state change abuse
@@ -433,10 +415,7 @@ class BookingApiController extends Controller
         }
     }
 
-    /**
-     * Check vehicle availability with Enhanced Security
-     * POST /api/v1/bookings/check-availability
-     */
+    //Check vehicle availability
     public function checkAvailability(Request $request): JsonResponse
     {
         // Rate limiting for availability check abuse

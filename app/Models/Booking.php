@@ -51,17 +51,13 @@ class Booking extends Model
         'return_inspection' => 'array'
     ];
 
-    /**
-     * Check if booking has pending additional charges
-     */
+    //Check if booking has pending additional charges
     public function hasPendingAdditionalCharges(): bool
     {
         return $this->payment_status === 'additional_charges_pending';
     }
 
-    /**
-     * Get pending additional charges amount
-     */
+    //Get pending additional charges amount
     public function getPendingAdditionalCharges()
     {
         return \App\Models\Payment::where('booking_id', $this->id)
@@ -70,9 +66,7 @@ class Booking extends Model
                 ->first();
     }
 
-    /**
-     * Cache for state object
-     */
+    //Cache for state object
     private ?BookingState $stateObject = null;
 
     // Relationships
@@ -139,9 +133,7 @@ class Booking extends Model
         return $this->status === 'cancelled';
     }
 
-    /**
-     * Get state object - uses State Pattern
-     */
+    //Get state object
     public function getState(): BookingState
     {
         // Create new state object if status has changed or not cached
@@ -152,25 +144,18 @@ class Booking extends Model
         return $this->stateObject;
     }
 
-    /**
-     * Get available actions for this booking based on current state
-     */
+    //Get available actions for this booking based on current state
     public function getAvailableActions(): array
     {
         return $this->getState()->getAvailableActions();
     }
 
-    /**
-     * Check if booking can transition to specific state
-     */
+    //Check if booking can transition to specific state
     public function canTransitionTo(string $newState): bool
     {
         return $this->getState()->canTransitionTo($newState);
     }
 
-    /**
-     * Transition to new state using State Pattern
-     */
     public function transitionTo(string $newState, array $data = []): bool
     {
         if (!$this->canTransitionTo($newState)) {
@@ -180,7 +165,6 @@ class Booking extends Model
         // Clear state cache to force recreation after transition
         $this->stateObject = null;
 
-        // Call the appropriate transition method on state object
         switch ($newState) {
             case 'confirmed':
                 return $this->confirm();
@@ -195,33 +179,23 @@ class Booking extends Model
         }
     }
 
-    /**
-     * Get state-specific message for user
-     */
     public function getStateMessage(): string
     {
         return $this->getState()->getStateMessage();
     }
 
-    /**
-     * Check if booking requires payment based on state
-     */
+
     public function requiresPayment(): bool
     {
         return $this->getState()->requiresPayment();
     }
 
-    /**
-     * Get next logical state for this booking
-     */
+    //Get next logical state for this booking
     public function getNextState(): ?string
     {
         return $this->getState()->getNextState();
     }
 
-    /**
-     * Get badge colors using StateFactory
-     */
     public function getStatusBadgeColorAttribute()
     {
         return StateFactory::getStatusBadgeColor($this->status);
@@ -232,13 +206,7 @@ class Booking extends Model
         return StateFactory::getPaymentBadgeColor($this->payment_status);
     }
 
-    /**
-     * Convenience methods for common state transitions
-     */
-
-    /**
-     * Confirm this booking
-     */
+    //Confirm this booking
     public function confirm(): bool
     {
         $result = $this->getState()->confirm();
@@ -249,9 +217,7 @@ class Booking extends Model
         return $result;
     }
 
-    /**
-     * Cancel this booking
-     */
+    //Cancel this booking
     public function cancel(string $reason = 'Cancelled by customer'): bool
     {
         $result = $this->getState()->cancel($reason);
@@ -262,9 +228,7 @@ class Booking extends Model
         return $result;
     }
 
-    /**
-     * Activate this booking (mark as picked up)
-     */
+    //Activate this booking (mark as picked up)
     public function activate(): bool
     {
         $result = $this->getState()->activate();
@@ -275,9 +239,7 @@ class Booking extends Model
         return $result;
     }
 
-    /**
-     * Complete this booking
-     */
+    //Complete this booking
     public function complete(array $data = []): bool
     {
         $result = $this->getState()->complete($data);
@@ -288,7 +250,6 @@ class Booking extends Model
         return $result;
     }
 
-    // Scopes for easy querying
     public function scopeActive($query)
     {
         return $query->whereIn('status', ['confirmed', 'active']);
@@ -316,9 +277,7 @@ class Booking extends Model
                $this->return_datetime >= $pickupDate;
     }
 
-    /**
-     * Boot method to add model events for state transitions
-     */
+    //Boot method to add model events for state transitions
     protected static function boot()
     {
         parent::boot();
@@ -343,79 +302,58 @@ class Booking extends Model
     }
 
     // State-based query methods
-
-    /**
-     * Get bookings that can be confirmed
-     */
+    //Get bookings that can be confirmed
     public function scopeCanBeConfirmed($query)
     {
         return $query->where('status', 'pending')
                     ->where('payment_status', 'paid');
     }
 
-    /**
-     * Get bookings that can be cancelled
-     */
+    //Get bookings that can be cancelled
     public function scopeCanBeCancelled($query)
     {
         return $query->whereIn('status', ['pending', 'confirmed']);
     }
 
-    /**
-     * Get bookings that can be activated
-     */
+    
+    //Get bookings that can be activated
     public function scopeCanBeActivated($query)
     {
         return $query->where('status', 'confirmed')
                     ->where('pickup_datetime', '<=', now());
     }
 
-    /**
-     * Get bookings that can be completed
-     */
+
+    //Get bookings that can be completed
     public function scopeCanBeCompleted($query)
     {
         return $query->where('status', 'active')
                     ->where('return_datetime', '<=', now());
     }
 
-    // State Pattern utility methods
-
-    /**
-     * Get all possible actions for any booking state
-     */
+    //Get all possible actions for any booking state
     public static function getAllPossibleActions(): array
     {
         return ['view', 'confirm', 'cancel', 'activate', 'complete', 'pay'];
     }
 
-    /**
-     * Check if specific action is available for this booking
-     */
+
     public function canPerformAction(string $action): bool
     {
         return in_array($action, $this->getAvailableActions());
     }
 
-    /**
-     * Get state workflow description
-     */
     public static function getStateWorkflow(): array
     {
         return StateFactory::getStateWorkflow();
     }
 
-    /**
-     * Check if booking is in a terminal state (cannot transition further)
-     */
+    //Check if booking is in a terminal state (cannot transition further)
     public function isInTerminalState(): bool
     {
         return in_array($this->status, ['completed', 'cancelled']);
     }
 
-    /**
-     * Get human-readable status description
-     */
     public function getStatusDescription(): string
     {
         $descriptions = [
