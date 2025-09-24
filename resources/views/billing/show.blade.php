@@ -265,13 +265,6 @@
                 </div>
                 @endif
                 
-                @if(isset($breakdown) && isset($breakdown['tax']))
-                <div class="charges-row">
-                    <span>SST (6%)</span>
-                    <span>RM {{ number_format($breakdown['tax'], 2) }}</span>
-                </div>
-                @endif
-                
                 @if(isset($breakdown) && isset($breakdown['grand_total']))
                 <div class="charges-row grand-total">
                     <span>Grand Total</span>

@@ -1,7 +1,7 @@
 <?php
 // app/Strategy/PaymentService.php
 
-namespace App\Strategy;
+namespace App\Services;
 
 use App\Strategy\PaymentStrategies\PaymentStrategyInterface;
 use App\Strategy\PaymentStrategies\CreditCardPaymentStrategy;

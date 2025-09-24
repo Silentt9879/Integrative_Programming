@@ -114,8 +114,7 @@ class BillingController extends Controller
         // Calculate breakdown
         $subtotal = $booking->total_amount;
         $additionalCharges = $booking->damage_charges + $booking->late_fees;
-        $tax = ($subtotal + $additionalCharges) * 0.06; // 6% SST
-        $grandTotal = $subtotal + $additionalCharges + $tax;
+        $grandTotal = $subtotal + $additionalCharges;
         
         $breakdown = [
             'base_rental' => $booking->total_amount,
@@ -124,7 +123,6 @@ class BillingController extends Controller
             'late_fees' => $booking->late_fees,
             'additional_total' => $additionalCharges,
             'subtotal' => $subtotal + $additionalCharges,
-            'tax' => $tax,
             'grand_total' => $grandTotal,
             'has_unpaid_charges' => $hasUnpaidCharges,
             'unpaid_amount' => $hasUnpaidCharges ? $additionalCharges : 0

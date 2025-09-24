@@ -1,7 +1,7 @@
 <?php
 // app/Strategy/ReportService.php
 
-namespace App\Strategy;
+namespace App\Services;
 
 use App\Strategy\ReportStrategies\ReportGenerationStrategyInterface;
 use App\Strategy\ReportStrategies\PdfReportStrategy;
