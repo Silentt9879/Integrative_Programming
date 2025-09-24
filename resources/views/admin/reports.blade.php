@@ -271,7 +271,6 @@
                             </div>
                             <h4 id="totalRevenue">RM{{ number_format($stats['totalRevenue'], 2) }}</h4>
                             <p class="text-muted mb-0">Total Revenue</p>
-                            <small class="text-success">+15% vs last month</small>
                         </div>
                     </div>
                     <div class="col-lg-6 col-md-6">
@@ -281,7 +280,6 @@
                             </div>
                             <h4 id="totalVehicles">{{ $stats['totalVehicles'] }}</h4>
                             <p class="text-muted mb-0">Total Vehicles</p>
-                            <small class="text-info">Available in fleet</small>
                         </div>
                     </div>
                 </div>

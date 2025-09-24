@@ -420,7 +420,7 @@ class ObserverApiController extends Controller
     {
         // Rate limiting for statistics access
         $identifier = Auth::id() ?? request()->ip();
-// And fix this line too:
+
 if (RateLimiter::tooManyAttempts('observer-stats-access:' . $identifier, 60)) {
     Log::warning('Observer statistics access abuse detected', [
         'admin_id' => Auth::id(),
