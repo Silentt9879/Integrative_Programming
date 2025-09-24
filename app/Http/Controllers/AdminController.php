@@ -471,18 +471,17 @@ class AdminController extends Controller
             'current_mileage' => 'required|numeric|min:0',
             'status' => 'required|in:available,rented,maintenance',
             'description' => 'nullable|string|max:500',
-            'image_url' => 'nullable|url',
+            'image' => 'required|file|image|mimes:jpeg,png,jpg,gif|max:5120|dimensions:min_width=100,min_height=100,max_width=2000,max_height=2000',
             'daily_rate' => 'required|numeric|min:0',
             'weekly_rate' => 'nullable|numeric|min:0',
             'monthly_rate' => 'nullable|numeric|min:0'
         ]);
 
-        // image url
+        // Handle secure image upload only
         if ($request->hasFile('image')) {
-            $imagePath = $request->file('image')->store('vehicles', 'public');
-            $validated['image_url'] = '/storage/' . $imagePath;
-        } elseif ($request->filled('image_url')) {
-            $validated['image_url'] = $request->image_url;
+            // Use VehicleService for secure file handling
+            $vehicleService = app(\App\Services\VehicleService::class);
+            $validated['image_url'] = $vehicleService->handleSecureImageUpload($request->file('image'));
         }
 
         try {
@@ -513,53 +512,57 @@ class AdminController extends Controller
     }
 
     //Update/edit vehicle - Factory Method Pattern -Tan Xing Ye
- public function updateVehicle(Request $request, Vehicle $vehicle)
-{
-    $this->ensureAdminAccess();
+    public function updateVehicle(Request $request, Vehicle $vehicle)
+    {
+        $this->ensureAdminAccess();
 
-    $validated = $request->validate([
-        'license_plate' => 'required|string|max:20|unique:vehicles,license_plate,' . $vehicle->id,
-        'make' => 'required|string|max:50',
-        'model' => 'required|string|max:50',
-        'year' => 'required|integer|min:1900|max:' . (date('Y') + 1),
-        'color' => 'required|string|max:30',
-        'type' => 'required|in:Sedan,SUV,Luxury,Economy,Truck,Van',
-        'seating_capacity' => 'required|integer|min:1|max:15',
-        'fuel_type' => 'required|in:Petrol,Diesel,Electric,Hybrid',
-        'current_mileage' => 'required|numeric|min:0',
-        'status' => 'required|in:available,rented,maintenance',
-        'description' => 'nullable|string|max:500',
-        'image_url' => 'nullable|url',
-        'daily_rate' => 'required|numeric|min:0',
-        'weekly_rate' => 'nullable|numeric|min:0',
-        'monthly_rate' => 'nullable|numeric|min:0'
-    ]);
+        $validated = $request->validate([
+            'license_plate' => 'required|string|max:20|unique:vehicles,license_plate,' . $vehicle->id,
+            'make' => 'required|string|max:50',
+            'model' => 'required|string|max:50',
+            'year' => 'required|integer|min:1900|max:' . (date('Y') + 1),
+            'color' => 'required|string|max:30',
+            'type' => 'required|in:Sedan,SUV,Luxury,Economy,Truck,Van',
+            'seating_capacity' => 'required|integer|min:1|max:15',
+            'fuel_type' => 'required|in:Petrol,Diesel,Electric,Hybrid',
+            'current_mileage' => 'required|numeric|min:0',
+            'status' => 'required|in:available,rented,maintenance',
+            'description' => 'nullable|string|max:500',
+            'image' => 'nullable|file|image|mimes:jpeg,png,jpg,gif|max:5120|dimensions:min_width=100,min_height=100,max_width=2000,max_height=2000',
+            'daily_rate' => 'required|numeric|min:0',
+            'weekly_rate' => 'nullable|numeric|min:0',
+            'monthly_rate' => 'nullable|numeric|min:0'
+        ]);
 
-    // ADD THIS MISSING CODE:
-    // Handle image file if uploaded
-    if ($request->hasFile('image')) {
-        $imagePath = $request->file('image')->store('vehicles', 'public');
-        $validated['image_url'] = '/storage/' . $imagePath;
-    } elseif ($request->filled('image_url')) {
-        $validated['image_url'] = $request->image_url;
+        // Handle secure image upload only
+        if ($request->hasFile('image')) {
+            // Use VehicleService for secure file handling
+            $vehicleService = app(\App\Services\VehicleService::class);
+
+            // Delete old image if it exists
+            if ($vehicle->image_url && Storage::disk('public')->exists(str_replace('/storage/', '', $vehicle->image_url))) {
+                Storage::disk('public')->delete(str_replace('/storage/', '', $vehicle->image_url));
+            }
+
+            $validated['image_url'] = $vehicleService->handleSecureImageUpload($request->file('image'));
+        }
+
+        try {
+            $creator = VehicleFactoryRegistry::getCreator($validated['type']);
+            $vehicle = $creator->updateVehicle($vehicle, $validated);
+
+            return redirect()->route('admin.vehicles')
+                ->with('success', 'Vehicle updated successfully using Factory Method Pattern!');
+        } catch (\InvalidArgumentException $e) {
+            return redirect()->back()
+                ->withErrors(['type' => 'Unsupported vehicle type: ' . $validated['type']])
+                ->withInput();
+        } catch (\Exception $e) {
+            return redirect()->back()
+                ->withErrors(['error' => 'Failed to update vehicle: ' . $e->getMessage()])
+                ->withInput();
+        }
     }
-
-    try {
-        $creator = VehicleFactoryRegistry::getCreator($validated['type']);
-        $vehicle = $creator->updateVehicle($vehicle, $validated);
-
-        return redirect()->route('admin.vehicles')
-            ->with('success', 'Vehicle updated successfully using Factory Method Pattern!');
-    } catch (\InvalidArgumentException $e) {
-        return redirect()->back()
-            ->withErrors(['type' => 'Unsupported vehicle type: ' . $validated['type']])
-            ->withInput();
-    } catch (\Exception $e) {
-        return redirect()->back()
-            ->withErrors(['error' => 'Failed to update vehicle: ' . $e->getMessage()])
-            ->withInput();
-    }
-}
 
     //Delete vehicle
     public function deleteVehicle(Vehicle $vehicle)
@@ -1230,9 +1233,9 @@ class AdminController extends Controller
             $booking->update([
                 'damage_charges' => $validated['damage_charges'] ?? 0,
                 'late_fees' => $validated['late_fees'] ?? 0,
-                'notes' => ($booking->notes ?? '') . "\n\nAdditional Charges Applied by Admin:\n" . 
-                          $validated['charge_reason'] . 
-                          ($validated['charge_notes'] ? "\nNotes: " . $validated['charge_notes'] : ''),
+                'notes' => ($booking->notes ?? '') . "\n\nAdditional Charges Applied by Admin:\n" .
+                    $validated['charge_reason'] .
+                    ($validated['charge_notes'] ? "\nNotes: " . $validated['charge_notes'] : ''),
                 'updated_at' => now()
             ]);
 
@@ -1274,10 +1277,9 @@ class AdminController extends Controller
             }
 
             return back()->with('success', 'Additional charges of $' . number_format($totalAdditional, 2) . ' applied successfully.');
-
         } catch (\Exception $e) {
             DB::rollback();
-            
+
             Log::error("Failed to set additional charges for booking {$booking->id}: " . $e->getMessage());
 
             if ($request->ajax()) {
@@ -1334,8 +1336,8 @@ class AdminController extends Controller
 
             DB::commit();
 
-            $waivedAmount = ($validated['waive_damage'] ? $originalDamage : 0) + 
-                           ($validated['waive_late_fees'] ? $originalLateFees : 0);
+            $waivedAmount = ($validated['waive_damage'] ? $originalDamage : 0) +
+                ($validated['waive_late_fees'] ? $originalLateFees : 0);
 
             Log::info("Admin waived charges for booking {$booking->id}", [
                 'admin_id' => Auth::id(),
@@ -1355,10 +1357,9 @@ class AdminController extends Controller
             }
 
             return back()->with('success', 'Charges of $' . number_format($waivedAmount, 2) . ' waived successfully.');
-
         } catch (\Exception $e) {
             DB::rollback();
-            
+
             Log::error("Failed to waive charges for booking {$booking->id}: " . $e->getMessage());
 
             if ($request->ajax()) {
@@ -1740,11 +1741,9 @@ class AdminController extends Controller
         } catch (\Exception $e) {
             return redirect()->back()->with('error', 'Error generating PDF: ' . $e->getMessage());
         }
-
-
     }
 
-        private function handleImageUpdate(Vehicle $vehicle, array &$validated, Request $request)
+    private function handleImageUpdate(Vehicle $vehicle, array &$validated, Request $request)
     {
         if ($request->hasFile('image')) {
             // Delete old image if it exists
@@ -1779,8 +1778,8 @@ class AdminController extends Controller
     }
 
     /**
-    * Export customers report as PDF
-    */
+     * Export customers report as PDF
+     */
     public function exportCustomersReport(Request $request)
     {
         $this->ensureAdminAccess();
@@ -1790,14 +1789,14 @@ class AdminController extends Controller
 
         // Build query based on filters
         $query = User::where('is_admin', 0)
-                 ->withCount(['bookings', 'bookings as active_bookings_count' => function ($query) {
-                     $query->whereIn('status', ['confirmed', 'active']);
-                 }, 'bookings as completed_bookings_count' => function ($query) {
-                     $query->where('status', 'completed');
-                 }])
-                 ->with(['bookings' => function ($query) {
-                     $query->latest()->limit(1);
-                 }]);
+            ->withCount(['bookings', 'bookings as active_bookings_count' => function ($query) {
+                $query->whereIn('status', ['confirmed', 'active']);
+            }, 'bookings as completed_bookings_count' => function ($query) {
+                $query->where('status', 'completed');
+            }])
+            ->with(['bookings' => function ($query) {
+                $query->latest()->limit(1);
+            }]);
 
         // Apply filters
         if ($request->filled('search')) {
@@ -1816,7 +1815,7 @@ class AdminController extends Controller
         switch ($request->get('sort', 'newest')) {
             case 'oldest':
                 $query->oldest();
-                    break;
+                break;
             case 'name':
                 $query->orderBy('name');
                 break;
@@ -1833,13 +1832,13 @@ class AdminController extends Controller
         $customers = $customers->map(function ($customer) {
             // Calculate total spent
             $customer->total_spent = $customer->bookings()
-                                                ->where('payment_status', 'paid')
-                                                ->sum('total_amount');
+                ->where('payment_status', 'paid')
+                ->sum('total_amount');
 
             // Calculate average booking value
             $completedBookings = $customer->bookings()->where('status', 'completed')->count();
-            $customer->average_booking_value = $completedBookings > 0 
-                ? $customer->total_spent / $completedBookings 
+            $customer->average_booking_value = $completedBookings > 0
+                ? $customer->total_spent / $completedBookings
                 : 0;
 
             // Get last booking date
@@ -1871,18 +1870,17 @@ class AdminController extends Controller
             'customers' => $customers,
             'groupedCustomers' => $groupedCustomers,
             'stats' => $stats,
-            'reportPeriod' => $request->filled('search') || $request->filled('status') 
-                ? 'Filtered Results' 
+            'reportPeriod' => $request->filled('search') || $request->filled('status')
+                ? 'Filtered Results'
                 : 'All Time',
         ];
 
         // Generate PDF
         $pdf = Pdf::loadView('reports.customer-report', $reportData);
         $pdf->setPaper('A4', 'portrait');
-    
+
         $filename = 'customers-report-' . now()->format('Y-m-d-H-i-s') . '.pdf';
-    
+
         return $pdf->download($filename);
     }
-
 }

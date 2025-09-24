@@ -375,59 +375,101 @@ class VehicleService
         }
     }
 
-    //File Upload Security with Malicious Content Detection -secure coding practices - XY
-    private function handleImageUpload($image): string
-{
-    try {
-        //Advanced security checks
-        if (!$this->isSecureImage($image)) {
-            throw new \Exception('Security validation failed');
+    /**
+     * Handle secure image upload for admin controller - File Upload Security with Malicious Content Detection
+     *
+     * @param \Illuminate\Http\UploadedFile $file
+     * @return string
+     * @throws \Exception
+     */
+    public function handleSecureImageUpload($file): string
+    {
+        try {
+            // Advanced security checks
+            if (!$this->isSecureImage($file)) {
+                throw new \Exception('Security validation failed');
+            }
+
+            // Secure filename generation
+            $secureName = Str::random(40) . '_' . time() . '.' . $file->getClientOriginalExtension();
+            $imagePath = $file->storeAs('vehicles', $secureName, 'public');
+
+            return '/storage/' . $imagePath;
+        } catch (\Exception $e) {
+            Log::error('Secure image upload failed: ' . $e->getMessage());
+            throw new \Exception('Failed to upload image securely');
         }
-
-        // Secure filename generation
-        $secureName = Str::random(40) . '_' . time() . '.' . $image->getClientOriginalExtension();
-
-        $imagePath = $image->storeAs('vehicles', $secureName, 'public');
-        return '/storage/' . $imagePath;
-    } catch (\Exception $e) {
-        Log::error('Error uploading image: ' . $e->getMessage());
-        throw new \Exception('Failed to upload image');
     }
-}
-
-private function isSecureImage($image): bool
-{
-    // MIME type validation
-    $allowedMimes = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif'];
-    if (!in_array($image->getMimeType(), $allowedMimes)) {
-        return false;
-    }
-
-    // File content validation
-    if (@getimagesize($image->getPathname()) === false) {
-        return false;
-    }
-
-    // Check for malicious content
-    $content = file_get_contents($image->getPathname());
-    if (strpos($content, '<?php') !== false || strpos($content, '<?=') !== false) {
-        return false;
-    }
-
-    return true;
-}
 
     /**
-     * Delete image file
+     * Standard image upload method - used internally by the service
+     *
+     * @param \Illuminate\Http\UploadedFile $image
+     * @return string
+     * @throws \Exception
+     */
+    private function handleImageUpload($image): string
+    {
+        try {
+            // Advanced security checks
+            if (!$this->isSecureImage($image)) {
+                throw new \Exception('Security validation failed');
+            }
+
+            // Secure filename generation
+            $secureName = Str::random(40) . '_' . time() . '.' . $image->getClientOriginalExtension();
+            $imagePath = $image->storeAs('vehicles', $secureName, 'public');
+
+            return '/storage/' . $imagePath;
+        } catch (\Exception $e) {
+            Log::error('Error uploading image: ' . $e->getMessage());
+            throw new \Exception('Failed to upload image');
+        }
+    }
+
+    /**
+     * Validate if uploaded file is a secure image
+     *
+     * @param \Illuminate\Http\UploadedFile $image
+     * @return bool
+     */
+    private function isSecureImage($image): bool
+    {
+        // MIME type validation
+        $allowedMimes = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif'];
+        if (!in_array($image->getMimeType(), $allowedMimes)) {
+            return false;
+        }
+
+        // File content validation
+        if (@getimagesize($image->getPathname()) === false) {
+            return false;
+        }
+
+        // Check for malicious content
+        $content = file_get_contents($image->getPathname());
+        if (strpos($content, '<?php') !== false || strpos($content, '<?=') !== false) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Delete image file with path traversal protection
      *
      * @param string $imageUrl
      */
     private function deleteImage(string $imageUrl): void
     {
         try {
-            $imagePath = str_replace('/storage/', '', $imageUrl);
-            if (Storage::disk('public')->exists($imagePath)) {
-                Storage::disk('public')->delete($imagePath);
+            if ($imageUrl && str_starts_with($imageUrl, '/storage/')) {
+                $path = str_replace('/storage/', '', $imageUrl);
+
+                // Prevent directory traversal attacks
+                if (!str_contains($path, '..') && str_starts_with($path, 'vehicles/')) {
+                    Storage::disk('public')->delete($path);
+                }
             }
         } catch (\Exception $e) {
             Log::warning('Failed to delete image: ' . $e->getMessage());

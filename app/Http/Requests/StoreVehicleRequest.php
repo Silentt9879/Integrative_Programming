@@ -106,33 +106,14 @@ class StoreVehicleRequest extends FormRequest
                 // XSS protection - will be escaped in display
             ],
 
-            // Image Handling - Security focused
+            // Image Handling - Local Upload Only with Security
             'image' => [
-                'nullable',
+                'required', // Changed from nullable to required
+                'file',
                 'image',
                 'mimes:jpeg,png,jpg,gif',
                 'max:5120', // 5MB max
                 'dimensions:min_width=100,min_height=100,max_width=2000,max_height=2000',
-            ],
-            'image_url' => [
-                'nullable',
-                'url',
-                'max:255',
-                function ($attribute, $value, $fail) {
-                    if ($value) {
-                        // HTTPS enforcement
-                        if (parse_url($value, PHP_URL_SCHEME) !== 'https') {
-                            $fail('Only HTTPS image URLs are allowed.');
-                        }
-
-                        // Domain whitelist (optional but recommended)
-                        $allowedDomains = ['images.unsplash.com', 'cdn.yourdomain.com'];
-                        $domain = parse_url($value, PHP_URL_HOST);
-                        if (!empty($allowedDomains) && !in_array($domain, $allowedDomains)) {
-                            $fail('Image domain not allowed.');
-                        }
-                    }
-                },
             ],
 
             // Rental Rate Information - Financial data validation
@@ -178,7 +159,7 @@ class StoreVehicleRequest extends FormRequest
     }
 
     /**
-     * Get custom attributes for validator errors 
+     * Get custom attributes for validator errors
      */
     public function attributes(): array
     {
@@ -209,19 +190,11 @@ class StoreVehicleRequest extends FormRequest
         ]);
     }
 
-    /**
-     * Configure the validator instance
-     */
     public function withValidator($validator): void
     {
         $validator->after(function ($validator) {
             // Additional business logic validation
-
-            // Ensure image is provided either as file or URL, but not both
-            if ($this->hasFile('image') && $this->filled('image_url')) {
-                $validator->errors()->add('image', 'Please provide either an image file or URL, not both.');
-            }
-
+            
             // Validate weekly rate is higher than daily rate
             if ($this->filled('daily_rate') && $this->filled('weekly_rate')) {
                 if ($this->weekly_rate < ($this->daily_rate * 6)) {

@@ -108,33 +108,14 @@ class UpdateVehicleRequest extends FormRequest
                 'max:1000',
             ],
 
-            // Image Handling
+            // Image Handling - Local Upload Only
             'image' => [
-                'nullable',
+                'nullable', // Keep for updates
+                'file',
                 'image',
                 'mimes:jpeg,png,jpg,gif',
                 'max:5120',
                 'dimensions:min_width=100,min_height=100,max_width=2000,max_height=2000',
-            ],
-            'image_url' => [
-                'nullable',
-                'url',
-                'max:255',
-                function ($attribute, $value, $fail) {
-                    if ($value) {
-                        // HTTPS enforcement
-                        if (parse_url($value, PHP_URL_SCHEME) !== 'https') {
-                            $fail('Only HTTPS image URLs are allowed.');
-                        }
-
-                        // Domain whitelist (optional but recommended)
-                        $allowedDomains = ['images.unsplash.com', 'cdn.yourdomain.com'];
-                        $domain = parse_url($value, PHP_URL_HOST);
-                        if (!empty($allowedDomains) && !in_array($domain, $allowedDomains)) {
-                            $fail('Image domain not allowed.');
-                        }
-                    }
-                },
             ],
 
             // Rental Rate Information
