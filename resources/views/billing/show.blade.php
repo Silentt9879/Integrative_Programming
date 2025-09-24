@@ -163,7 +163,7 @@
         </div>
         
         <!-- Outstanding Alert -->
-        @if($breakdown['outstanding'] > 0)
+        @if(isset($breakdown) && isset($breakdown['outstanding']) && $breakdown['outstanding'] > 0)
         <div class="outstanding-alert">
             <i class="fas fa-exclamation-triangle me-2"></i>
             <strong>Outstanding Balance:</strong> RM {{ number_format($breakdown['outstanding'], 2) }}
@@ -258,29 +258,35 @@
                 </div>
                 @endif
                 
+                @if(isset($breakdown) && isset($breakdown['subtotal']))
                 <div class="charges-row">
                     <span>Subtotal</span>
                     <span>RM {{ number_format($breakdown['subtotal'], 2) }}</span>
                 </div>
+                @endif
                 
+                @if(isset($breakdown) && isset($breakdown['tax']))
                 <div class="charges-row">
                     <span>SST (6%)</span>
                     <span>RM {{ number_format($breakdown['tax'], 2) }}</span>
                 </div>
+                @endif
                 
+                @if(isset($breakdown) && isset($breakdown['grand_total']))
                 <div class="charges-row grand-total">
                     <span>Grand Total</span>
                     <span>RM {{ number_format($breakdown['grand_total'], 2) }}</span>
                 </div>
+                @endif
                 
-                @if($breakdown['paid_amount'] > 0)
+                @if(isset($breakdown) && isset($breakdown['paid_amount']) && $breakdown['paid_amount'] > 0)
                 <div class="charges-row text-success">
                     <span>Amount Paid</span>
                     <span>- RM {{ number_format($breakdown['paid_amount'], 2) }}</span>
                 </div>
                 @endif
                 
-                @if($breakdown['outstanding'] > 0)
+                @if(isset($breakdown) && isset($breakdown['outstanding']) && $breakdown['outstanding'] > 0)
                 <div class="charges-row total text-danger">
                     <span>Outstanding Balance</span>
                     <span>RM {{ number_format($breakdown['outstanding'], 2) }}</span>
@@ -336,7 +342,7 @@
                 <i class="fas fa-car me-2"></i> View Booking
             </a>
             
-            @if($breakdown['outstanding'] > 0)
+            @if(isset($breakdown) && isset($breakdown['outstanding']) && $breakdown['outstanding'] > 0)
                 @if($booking->payment_status == 'additional_charges_pending')
                     <a href="{{ route('payment.additional-charges', $booking->id) }}" class="btn btn-warning">
                         <i class="fas fa-credit-card me-2"></i> Pay Additional Charges
